@@ -7,14 +7,14 @@
 namespace bambu::ui {
 namespace {
 constexpr std::array<EmotionInfo, static_cast<size_t>(Emotion::Count)> kInfo{{
-    {"Idle", "A quiet companion. Gentle breathing and a curious little blink.", 0x86E6A8},
+    {"Idle", "A quiet companion. Gentle breathing and a curious little blink.", kBambuGreen},
     {"Listening", "Eyes open, attention on you. A soft blue listening pulse.", 0x73DBF5},
     {"Thinking", "A sideways glance and three little moving thoughts.", 0xBAA0F8},
-    {"Speaking", "A small animated voice, with a face that stays attentive.", 0x8DE8CF},
-    {"Printing", "Keeping an eye on the job. Progress stays visible below.", 0x71E4A0},
-    {"Happy", "Smiling eyes and a tiny bounce. A little maker joy.", 0xC6EE8F},
-    {"Completed", "The print is ready. Happy eyes, a smile and a celebration.", 0xC6F48D},
-    {"Curious", "One eye raised. Ready to look a little closer.", 0x9BEAC9},
+    {"Speaking", "A small animated voice, with a face that stays attentive.", kBambuGreen},
+    {"Printing", "Keeping an eye on the job. Progress stays visible below.", kBambuGreen},
+    {"Happy", "Smiling eyes and a tiny bounce. A little maker joy.", kBambuGreen},
+    {"Completed", "The print is ready. Happy eyes, a smile and a celebration.", kBambuGreen},
+    {"Curious", "One eye raised. Ready to look a little closer.", kBambuGreen},
     {"Confused", "An uneven glance. Time to ask a useful follow-up.", 0xE5D5A1},
     {"Sleepy", "Slow breathing, resting eyes. Quiet company after hours.", 0xA5B7DF},
     {"Sad", "Soft eyes, a little tear. Something did not go as planned.", 0x8EBFE8},
@@ -125,7 +125,7 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     lv_obj_set_style_bg_opa(bar_, LV_OPA_COVER, LV_PART_MAIN);
     Visible(bar_, !round);
 
-    for (auto& piece : confetti_) piece = Box(root_, 0xB9EF8A, LV_RADIUS_CIRCLE);
+    for (auto& piece : confetti_) piece = Box(root_, kBambuGreen, LV_RADIUS_CIRCLE);
     ear_left_ = Box(root_, 0xEDFFF5, S(4));
     ear_right_ = Box(root_, 0xEDFFF5, S(4));
     antenna_ = Box(root_, 0xEDFFF5, S(5));
@@ -139,7 +139,7 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     cross_right_ = Line(root_, std::max(3, S(6)));
     mouth_ = Line(root_, std::max(3, S(6)));
     for (auto& dot : dots_) dot = Box(root_, 0xBAA0F8, LV_RADIUS_CIRCLE);
-    for (auto& voice : voice_) voice = Box(root_, 0x8DE8CF, LV_RADIUS_CIRCLE);
+    for (auto& voice : voice_) voice = Box(root_, kBambuGreen, LV_RADIUS_CIRCLE);
     tear_ = Box(root_, 0x8EBFE8, LV_RADIUS_CIRCLE);
     sleep_label_ = Label(root_, 0xA5B7DF);
     lv_label_set_text(sleep_label_, "z");
@@ -147,15 +147,45 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     brand_ = Label(root_, 0xB5D1BF);
     lv_label_set_text(brand_, "B A M B U   B O T");
     Rect(brand_, 46, round ? 34 : 14, 228, 18);
-    state_label_ = Label(root_, 0x86E6A8);
+    state_label_ = Label(root_, kBambuGreen);
     Rect(state_label_, 42, round ? 57 : 39, 236, 20);
     progress_label_ = Label(root_, 0xE5F4E8);
-    Rect(progress_label_, 38, 275, 244, 20);
+    Rect(progress_label_, 38, round ? 264 : 275, 244, 20);
     detail_label_ = Label(root_, 0x90AE9D);
-    Rect(detail_label_, 35, 295, 250, 20);
+    Rect(detail_label_, round ? 85 : 35, round ? 280 : 295, round ? 150 : 250, 20);
     lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
     source_label_ = Label(root_, 0x779E88);
-    Rect(source_label_, 118, round ? 253 : 242, 84, 18);
+    Rect(source_label_, 118, round ? 244 : 242, 84, 18);
+
+    // Compact icon/value pairs, centered inside the circular safe area.
+    temperature_row_ = Box(root_, 0);
+    lv_obj_set_style_bg_opa(temperature_row_, LV_OPA_TRANSP, 0);
+    Rect(temperature_row_, 85, round ? 280 : 294, 168, 22);
+    auto icon_line = [&](size_t index, float x, std::initializer_list<lv_point_precise_t> points) {
+        auto line = Line(temperature_row_, std::max(1, S(1.4f)));
+        lv_obj_set_pos(line, S(x), S(1));
+        lv_obj_set_style_line_color(line, lv_color_hex(0xB5D1BF), 0);
+        size_t i = 0;
+        for (auto point : points) temperature_points_[index][i++] = {
+            static_cast<lv_value_precise_t>(S(point.x)), static_cast<lv_value_precise_t>(S(point.y))};
+        lv_line_set_points(line, temperature_points_[index].data(), i);
+    };
+    // Nozzle: narrow neck, broad shoulder, pointed outlet; heat beneath.
+    icon_line(0, 0, {{6,1},{12,1},{12,6},{16,6},{9,12},{2,6},{6,6},{6,1}});
+    icon_line(1, 0, {{3,13},{2,15},{4,17},{3,19}});
+    icon_line(2, 0, {{9,15},{8,17},{9,19}});
+    icon_line(3, 0, {{15,13},{14,15},{16,17},{15,19}});
+    // Heated bed: horizontal plate with three rising heat waves.
+    icon_line(4, 86, {{1,16},{19,16},{19,19},{1,19},{1,16}});
+    for (size_t i = 0; i < 3; ++i) {
+        lv_value_precise_t x = 4 + static_cast<int>(i) * 6;
+        icon_line(5+i, 86, {{x,2},{x-1,4},{x+1,7},{x-1,10},{x,13}});
+    }
+    nozzle_value_ = Label(temperature_row_, 0xB5D1BF);
+    bed_value_ = Label(temperature_row_, 0xB5D1BF);
+    lv_obj_set_pos(nozzle_value_, S(24), S(3)); lv_obj_set_size(nozzle_value_, S(58), S(19));
+    lv_obj_set_pos(bed_value_, S(110), S(3)); lv_obj_set_size(bed_value_, S(58), S(19));
+    for (auto value : {nozzle_value_, bed_value_}) lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_LEFT, 0);
 
     from_ = to_ = Target(emotion_);
     transition_start_ = lv_tick_get();
@@ -231,7 +261,9 @@ void FaceView::SetAnimated(bool animated) {
     RenderAt(lv_tick_get());
 }
 void FaceView::SetMinimal(bool minimal) {
-    for (auto obj : {brand_,state_label_,progress_label_,detail_label_,source_label_}) Visible(obj,!minimal);
+    minimal_=minimal;
+    for (auto obj : {brand_,state_label_,progress_label_,source_label_}) Visible(obj,!minimal);
+    Labels();
     Visible(bar_,!minimal && !round_);
     Visible(ring_,!minimal && round_);
 }
@@ -250,10 +282,14 @@ void FaceView::Labels() {
         std::string progress=telemetry_.progress<0 ? "--" : std::to_string(telemetry_.progress);
         std::string remaining=telemetry_.remaining_min<0 ? "--" : std::to_string(telemetry_.remaining_min);
         snprintf(first,sizeof(first),"%s%%   /   %s min left",progress.c_str(),remaining.c_str());
-        std::string nozzle=telemetry_.nozzle_c<0 ? "--" : std::to_string(telemetry_.nozzle_c);
-        std::string bed=telemetry_.bed_c<0 ? "--" : std::to_string(telemetry_.bed_c);
-        snprintf(second,sizeof(second),"Nozzle %s C   /   Bed %s C",nozzle.c_str(),bed.c_str());
+        second[0]=0;
     }
+    std::string nozzle=live && telemetry_.nozzle_c>=0 ? std::to_string(telemetry_.nozzle_c) : "--";
+    std::string bed=live && telemetry_.bed_c>=0 ? std::to_string(telemetry_.bed_c) : "--";
+    lv_label_set_text(nozzle_value_,(nozzle+" °C").c_str());
+    lv_label_set_text(bed_value_,(bed+" °C").c_str());
+    Visible(temperature_row_,!minimal_ && live && message_.empty());
+    Visible(detail_label_,!minimal_ && (!live || !message_.empty()));
     lv_label_set_text(progress_label_,first);
     lv_label_set_text(detail_label_,message_.empty() ? second : message_.c_str());
     int progress=live && telemetry_.progress>=0 ? telemetry_.progress : 0;

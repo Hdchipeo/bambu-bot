@@ -10,6 +10,10 @@ Lấy cảm hứng từ biểu tượng robot xanh/trắng trong ảnh `IMG_6476
 
 Vẽ bằng `lv_obj`, `lv_line`, `lv_arc`, `lv_bar` và `lv_label`; không cần bitmap, GIF, SVG hay ThorVG. Các mảng điểm vẽ sống cùng component để an toàn với API `lv_line_set_points`. Animation dùng một timer 33 ms và tập đối tượng cố định, không tạo/xóa đối tượng ở mỗi frame.
 
+Màu xanh chính là **Bambu Green `#00AE42` — RGB `(0, 174, 66)`**, đối chiếu trực tiếp từ [logo Bambu Studio chính thức](https://github.com/bambulab/BambuStudio/blob/master/resources/images/splash_logo.svg). Dùng cho logo, điều khiển được chọn, tiến độ và các emotion xanh; màu cảnh báo/lỗi và các emotion khác vẫn phân biệt theo trạng thái. Nền tối là màu hỗ trợ tương phản, không phải mã xanh thương hiệu.
+
+Từ **0.2.2**, dòng nhiệt độ dùng icon đầu phun và bàn nhiệt thay chữ Nozzle/Bed, kèm giá trị `°C`. Hình vẽ LVGL độc lập theo hình thái của [nozzle](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_nozzle_temp.svg) và [bed](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_bed_temp.svg) trong Bambu Studio: đầu phun hướng xuống, bàn nhiệt có ba vệt nhiệt. Không nhập SVG hoặc mã nguồn Bambu Studio. Mất dữ liệu dùng `-- °C`; offline/stale ẩn dòng nhiệt độ, và thông điệp kích hoạt tạm thay thế dòng này.
+
 ## Chạy trên macOS
 
 ```sh
@@ -25,7 +29,7 @@ Nếu chưa build firmware và chưa có `managed_components/lvgl__lvgl`, CMake 
 
 ## Điều khiển
 
-Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản 0.2.0, thoát cửa sổ cũ rồi mở lại bản 0.2.1; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
+Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản cũ, thoát cửa sổ cũ rồi mở lại bản **0.2.2**; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
 
 | Thao tác | Kết quả |
 | --- | --- |

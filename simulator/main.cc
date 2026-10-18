@@ -15,6 +15,7 @@ using bambu::ui::Describe;
 using bambu::ui::Emotion;
 using bambu::ui::FaceView;
 using bambu::ui::Telemetry;
+using bambu::ui::kBambuGreen;
 namespace fs = std::filesystem;
 static_assert(LVGL_VERSION_MAJOR==9 && LVGL_VERSION_MINOR==5 && LVGL_VERSION_PATCH==0,
               "Bambu Bot Studio is tested with LVGL 9.5.0");
@@ -166,15 +167,15 @@ class Studio {
 public:
     Studio() {
         root_=Box(lv_screen_active(),0,0,kWidth,kHeight,0x0B120F,0);
-        auto logo=Box(root_,32,27,40,40,0x98E7AF,20);
-        auto mark=Box(logo,9,11,22,17,0x98E7AF,5); Border(mark,0x103624,3);
-        Box(logo,5,16,4,7,0x103624,1); Box(logo,31,16,4,7,0x103624,1);
-        Box(logo,12,7,3,6,0x103624,1); Box(logo,16,32,9,2,0x103624,1);
-        Box(logo,15,17,3,6,0x103624,1); Box(logo,23,17,3,6,0x103624,1);
+        auto logo=Box(root_,32,27,40,40,kBambuGreen,20);
+        auto mark=Box(logo,9,11,22,17,kBambuGreen,5); Border(mark,0xFFFFFF,3);
+        Box(logo,5,16,4,7,0xFFFFFF,1); Box(logo,31,16,4,7,0xFFFFFF,1);
+        Box(logo,12,7,3,6,0xFFFFFF,1); Box(logo,16,32,9,2,0xFFFFFF,1);
+        Box(logo,15,17,3,6,0xFFFFFF,1); Box(logo,23,17,3,6,0xFFFFFF,1);
         Label(root_,87,26,"Bambu Bot",&lv_font_montserrat_28,0xEFF6EE);
         Label(root_,88,60,"A little companion for every print.",&lv_font_montserrat_12,0x819D8C);
         auto tag=Box(root_,917,37,211,30,0x13241B,15);
-        Box(tag,13,11,7,7,0x9DE5A9,4);
+        Box(tag,13,11,7,7,kBambuGreen,4);
         Label(tag,29,8,"EMOTION STUDIO  /  " BAMBU_STUDIO_VERSION,&lv_font_montserrat_12,0xB8D2BE);
 
         auto left=Box(root_,32,108,640,585,0x101D16,22); Border(left,0x22362A);
@@ -205,7 +206,7 @@ public:
         lv_obj_set_pos(slider_,28,461); lv_obj_set_size(slider_,376,5);
         lv_slider_set_range(slider_,0,100); lv_slider_set_value(slider_,42,LV_ANIM_OFF);
         lv_obj_set_style_bg_color(slider_,lv_color_hex(0x2D4535),LV_PART_MAIN);
-        lv_obj_set_style_bg_color(slider_,lv_color_hex(0xA6E5AF),LV_PART_INDICATOR);
+        lv_obj_set_style_bg_color(slider_,lv_color_hex(kBambuGreen),LV_PART_INDICATOR);
         lv_obj_set_style_bg_color(slider_,lv_color_hex(0xDBF8DE),LV_PART_KNOB);
         lv_obj_set_style_pad_all(slider_,5,LV_PART_KNOB);
         lv_obj_add_event_cb(slider_,[](lv_event_t* e) {
@@ -234,8 +235,8 @@ public:
         lv_obj_set_pos(face_->root(),9,9);
         face_->SetEmotion(static_cast<Emotion>(selected_));
         face_->SetAnimated(motion_);
-        Border(round_button_,round?0x8DB996:0x2A3A31);
-        Border(rect_button_,round?0x2A3A31:0x8DB996);
+        Border(round_button_,round?kBambuGreen:0x2A3A31);
+        Border(rect_button_,round?0x2A3A31:kBambuGreen);
         lv_label_set_text(caption_,round?"466 x 466 AMOLED  /  Circular safe area":"280 x 240 LCD  /  Desk-bot test hardware");
         lv_obj_align(caption_,LV_ALIGN_BOTTOM_MID,0,-17);
         UpdateTelemetry();
@@ -296,6 +297,7 @@ private:
 
 std::string AllText(lv_obj_t* obj) {
     std::string result;
+    if (lv_obj_has_flag(obj,LV_OBJ_FLAG_HIDDEN)) return result;
     if (lv_obj_check_type(obj,&lv_label_class)) result+=lv_label_get_text(obj);
     for (uint32_t i=0;i<lv_obj_get_child_count(obj);++i) result+='\n'+AllText(lv_obj_get_child(obj,static_cast<int>(i)));
     return result;
@@ -374,6 +376,9 @@ void SelfTest(Canvas& canvas) {
         canvas.Frame(ticks+100);
     }
     studio.Select(0);
+    auto temperatures=AllText(studio.face().root());
+    Require(temperatures.find("220 °C")!=std::string::npos && temperatures.find("60 °C")!=std::string::npos,"Temperature values/units missing");
+    Require(temperatures.find("Nozzle")==std::string::npos && temperatures.find("Bed")==std::string::npos,"Temperature words should be replaced by icons");
     Telemetry unknown;unknown.connected=false;
     studio.face().SetTelemetry(unknown);
     auto text=AllText(studio.face().root());
@@ -385,8 +390,15 @@ void SelfTest(Canvas& canvas) {
     unknown.stale=false;
     studio.face().SetTelemetry(unknown);
     Require(AllText(studio.face().root()).find("--%")!=std::string::npos,"Missing progress not marked unknown");
+    Require(AllText(studio.face().root()).find("-- °C")!=std::string::npos,"Missing temperature not marked unknown");
     studio.face().SetMessage("Activation code: 123456");
     Require(AllText(studio.face().root()).find("123456")!=std::string::npos,"Message missing");
+    Require(AllText(studio.face().root()).find("°C")==std::string::npos,"Message must replace the temperature row");
+    studio.face().SetMessage("");
+    Require(AllText(studio.face().root()).find("-- °C")!=std::string::npos,"Temperature row did not return after message");
+    studio.face().SetMinimal(true); studio.face().SetEmotion(Emotion::Happy);
+    Require(AllText(studio.face().root()).find("°C")==std::string::npos,"Minimal face exposed temperatures after emotion change");
+    studio.face().SetMinimal(false);
     studio.ToggleMotion();canvas.Frame(ticks+1000);studio.ToggleMotion();
     Require(bambu::ui::FromXiaozhi("neutral")==Emotion::Idle,"XiaoZhi alias mismatch");
     Require(bambu::ui::FromXiaozhi("shocked")==Emotion::Error,"XiaoZhi error alias mismatch");

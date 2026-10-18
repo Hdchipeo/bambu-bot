@@ -9,6 +9,9 @@
 
 namespace bambu::ui {
 
+// Bambu Studio official splash_logo.svg fill; RGB (0, 174, 66).
+inline constexpr uint32_t kBambuGreen = 0x00AE42;
+
 enum class Emotion {
     Idle, Listening, Thinking, Speaking, Printing, Happy, Completed,
     Curious, Confused, Sleepy, Sad, Warning, Error, Offline, Count
@@ -84,6 +87,11 @@ private:
     lv_obj_t* progress_label_ = nullptr;
     lv_obj_t* detail_label_ = nullptr;
     lv_obj_t* source_label_ = nullptr;
+    lv_obj_t* temperature_row_ = nullptr;
+    lv_obj_t* nozzle_value_ = nullptr;
+    lv_obj_t* bed_value_ = nullptr;
+    // Independently drawn temperature symbols; persistent storage for LVGL lines.
+    std::array<std::array<lv_point_precise_t, 10>, 8> temperature_points_{};
     std::array<lv_obj_t*, 3> dots_{};
     std::array<lv_obj_t*, 5> voice_{};
     std::array<lv_obj_t*, 6> confetti_{};
@@ -99,7 +107,7 @@ private:
     uint32_t transition_start_ = 0;
     float scale_ = 1;
     int offset_x_ = 0, offset_y_ = 0;
-    bool round_ = false, animated_ = true;
+    bool round_ = false, animated_ = true, minimal_ = false;
     std::string message_;
 };
 }  // namespace bambu::ui
