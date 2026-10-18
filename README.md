@@ -1,64 +1,142 @@
-# Bambu Bot
+<div align="center">
 
-Robot chatbot để bàn theo dõi Bambu Lab A1, phát triển trên [XiaoZhi](https://github.com/78/xiaozhi-esp32).
+# 🤖 Bambu Bot
 
-## Giao diện và emotion trên macOS
+### Trợ lý AI để bàn dành cho góc in 3D của bạn
 
-Đã có **Bambu Bot Emotion Studio** dùng LVGL 9.5.0 + SDL2: 14 emotion có animation, hai kích thước LCD 280×240 / màn tròn 466×466, thanh tiến độ và chế độ chạy tự động.
+**Bambu Lab A1 · Hội thoại XiaoZhi · LVGL Emotion Studio · 3D Head Animation · LAN MQTT · MCP**
+
+[![ESP32-S3](https://img.shields.io/badge/Target-ESP32--S3-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
+[![ESP-IDF](https://img.shields.io/badge/ESP--IDF-5.5.4-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://github.com/espressif/esp-idf)
+[![LVGL](https://img.shields.io/badge/UI-LVGL_9.5.0-00AE42?style=flat-square)](https://lvgl.io/)
+[![Firmware](https://img.shields.io/badge/Firmware-v0.4.0-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
+[![Host Tests](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml)
+[![Simulator](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
+
+**[Tính năng](#features) · [Emotion Studio](#studio) · [Bắt đầu](#quick-start) · [Kết nối A1](#printer) · [Kiến trúc](#architecture) · [Phần cứng](#hardware) · [Tài liệu](#documentation)**
+
+<br />
+
+<img src="docs/ui/all-scenes-gallery.gif" alt="Một số kịch bản đầu robot 3D của Bambu Bot trong simulator LVGL" width="720" />
+
+*Preview từ simulator macOS · Robot chỉ có phần đầu và các đạo cụ theo kịch bản*
+
+</div>
+
+---
+
+## Tổng quan
+
+**Bambu Bot** là robot chatbot để bàn giúp bạn theo dõi máy in **Bambu Lab A1**, hỏi trạng thái bản in bằng giọng nói và tương tác với một đầu robot có biểu cảm. Dự án kết hợp nền hội thoại [XiaoZhi](https://github.com/78/xiaozhi-esp32), giao diện **LVGL** và dữ liệu máy in qua **MQTT TLS trong mạng LAN**.
+
+Bản mẫu hiện dùng phần cứng **Desk-bot ESP32-S3 + LCD 280×240**. **Emotion Studio trên macOS** dùng chung mã UI để thử bố cục, theme và animation trước khi nạp lên thiết bị. Tra cứu Bambu Wiki, hỗ trợ xử lý sự cố bằng RAG, màn AMOLED và chuyển động servo nằm trong lộ trình phát triển.
+
+<a id="features"></a>
+
+## 🌟 Tính năng
+
+| Khả năng | Đã triển khai | Trạng thái / giới hạn |
+| :--- | :--- | :--- |
+| **Hội thoại AI** | Mic/loa I2S, wake word, hội thoại qua XiaoZhi | Cần thiết lập server, kích hoạt và chọn ASR/TTS phù hợp |
+| **Theo dõi A1 qua LAN** | Tiến độ, nhiệt đầu phun/bàn nhiệt, trạng thái in qua MQTT TLS | Đã xác nhận telemetry với A1 thật; chưa kiểm thử chạy dài |
+| **Đầu robot 3D** | 18 kịch bản, 14 biểu cảm phần đầu, hai theme | LCD 280×240 dùng frame dựng sẵn; nhịp mục tiêu 20 FPS chưa được đo trên thiết bị |
+| **Emotion Studio** | LVGL 9.5.0 + SDL2; màn chữ nhật 280×240 và màn tròn 466×466 | Màn tròn trong simulator dùng renderer CPU |
+| **Giao diện máy in** | Icon máy in, đầu phun, bàn nhiệt và tiến độ; màu xanh `#00AE42` | HUD LVGL độc lập với animation, cập nhật theo telemetry |
+| **Công cụ MCP** | `self.bambu.get_printer_status` để trợ lý đọc trạng thái | Server/model AI cần hỗ trợ gọi công cụ |
+| **Thông báo sự kiện** | Popup và âm báo khi hoàn tất hoặc có `print_error` mới | Chưa có thông báo giọng nói chủ động hay giải mã HMS |
+| **Kiểm soát dữ liệu cũ** | Gộp bản tin từng phần, theo dõi tuổi từng trường, chống hoàn tất giả sau reconnect | Chưa lưu chống lặp sự kiện qua reboot |
+
+<a id="studio"></a>
+
+## 🎭 Emotion Studio & animation
+
+### Chạy thử trên macOS
 
 ```sh
 brew install cmake ninja sdl2
 ./scripts/run_simulator.sh
 ```
 
-![Bambu Bot emotions](docs/ui/emotion-sheet.png)
-
-Studio **0.4.0** có đủ **18 kịch bản 3D và 14 biểu cảm phần đầu**, hai theme, phát frame dựng sẵn trên 280×240 với nhịp mục tiêu 20 FPS. Chọn **3D scenes / D** hoặc **3D heads / E**. Xem [toàn bộ preview và kiến trúc animation](docs/ANIMATION_BANK.md).
-
-Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; firmware **v0.4.0** cho Desk-bot 280×240 dùng bank animation trong phân vùng assets, giữ renderer CPU làm dự phòng.
-
-## Bản thử nghiệm hiện tại
-
-Dùng phần cứng Desk-bot có sẵn: **ESP32-S3, màn ST7789 240×280, mic I2S và loa I2S**. Đây là cấu hình test trước khi chuyển sang Waveshare AMOLED 1.75.
-
-Từ Desk-bot chỉ nhập nguyên file định nghĩa phần cứng vào [`main/boards/bambu-deskbot/config.h`](main/boards/bambu-deskbot/config.h). Không nhập mã ứng dụng, camera, theo dõi khuôn mặt, GIF hay cấu hình dịch vụ của Desk-bot. Nền phần mềm lấy trực tiếp từ repo XiaoZhi gốc tại commit `49ac8a6da399f27a9546d4f73640b7f86c24bac6` (v2.2.6), phù hợp ESP-IDF 5.5.4 đang cài trên máy.
-
-| Đã triển khai trong mã | Giới hạn hiện tại |
-| --- | --- |
-| Hội thoại XiaoZhi, đầu robot 3D, icon máy in theo ảnh mẫu, icon đầu phun/bàn nhiệt | Cần cấu hình server và kiểm tra mic/loa thực tế |
-| Demo tiến độ A1, mỗi chu kỳ 120 giây; icon nhiệt độ và hai theme LCD | Không phải dữ liệu máy in thật |
-| MQTT TLS đọc trạng thái A1 qua LAN | Đã xác nhận MQTT/telemetry với A1 thật; cần cấu hình LAN riêng, chưa kiểm thử chạy dài |
-| MCP `self.bambu.get_printer_status` | Server/model cần hỗ trợ công cụ MCP |
-| Gộp bản tin từng phần, tuổi dữ liệu theo trường, chống hoàn tất giả sau reconnect | Chưa lưu chống lặp sự kiện qua reboot |
-| Popup và âm báo khi hoàn tất hoặc có `print_error` mới | Chưa có giọng nói thông báo chủ động, giải mã HMS hay RAG Wiki |
-| Không tự nạp bản firmware XiaoZhi do server discovery đề nghị | OTA discovery vẫn dùng để lấy cấu hình hội thoại/kích hoạt |
-
-Firmware v0.4.0 dùng chung `ui/scene3d.*` và `ui/printer_icon.h` với simulator. Có 15 cảnh vui luân phiên mỗi 12 giây khi idle; dữ liệu máy in ưu tiên cảnh Printing / Completed / Error. Lỗi/kết thúc do dữ liệu máy in xác nhận, không do biểu cảm AI hoặc vòng idle tự tạo. Khi nghe/nói, đầu robot đổi biểu cảm và tạm ẩn đạo cụ idle.
-
-Trên LCD 280×240, frame RGB565 được giải nén từ bank **5,28 MiB** trong phân vùng assets 8 MiB. Hai bộ đệm dùng chung **136.160 byte**; icon/chữ/tiến độ vẫn vẽ bằng LVGL. App còn **31%** phân vùng sau build, không đổi bảng phân vùng hoặc pinout. Nhịp 50 ms/frame là mục tiêu **20 FPS**, chưa được đo trên thiết bị; thiếu/hỏng bank thì dùng renderer CPU 140×120 như trước.
-
-![Bộ animation](docs/ui/all-scenes-gallery.gif)
-
-**Servo chưa bật:** `config.h` nguồn không định nghĩa chân servo. Không tự gán chân hoặc bật GPIO đèn mẫu của upstream.
-
-## Build và thử demo
-
-Cần ESP-IDF **5.5.4**, target ESP32-S3, flash 16 MB và PSRAM octal. Dependency được ghim trong `dependencies.lock`.
+| Điều khiển | Chức năng |
+| :--- | :--- |
+| **D / 3D scenes** | Chọn 18 kịch bản có đạo cụ |
+| **E / 3D heads** | Chọn 14 biểu cảm chỉ có đầu robot |
+| **T** | Đổi theme đen/xanh Bambu ↔ xanh Bambu/trắng |
+| **R** | Đổi màn chữ nhật / màn tròn |
+| **M** | Dừng / tiếp tục animation |
+| **B** | Phát lại đoạn mở đầu |
+| **← / →** | Chọn cảnh hoặc biểu cảm trước / sau |
+| **Space** | Bật / tắt trình tự phát tự động |
 
 ```sh
+./scripts/run_simulator.sh --all-demo
+./scripts/run_simulator.sh --heads-demo
+```
+
+### 18 kịch bản · 14 biểu cảm · 2 theme
+
+**Kịch bản:** chơi game, uống cà phê, nghe nhạc, khám phá, ngủ gật, ruồi bay qua, kiểm tra máy in, hoàn tất bản in, đua xe, uống trà sữa, chill, máy in lỗi, nhảy disco, chăm cây, máy bay giấy, ảo thuật, thư giãn và chào người dùng.
+
+**Biểu cảm:** Idle · Listening · Thinking · Speaking · Printing · Happy · Completed · Curious · Confused · Sleepy · Sad · Warning · Error · Offline.
+
+<div align="center">
+  <img src="docs/ui/all-heads-gallery.gif" alt="Một số biểu cảm đầu robot 3D của Bambu Bot" width="560" />
+</div>
+
+Firmware luân phiên **15 cảnh vui** khi idle, mỗi 12 giây. Cảnh máy in đang in, hoàn tất hoặc lỗi được chọn theo dữ liệu máy in xác nhận. Khi nghe/nói, robot ưu tiên biểu cảm hội thoại và ẩn đạo cụ idle. Biểu cảm AI không tự tạo sự kiện máy in.
+
+Xem [hướng dẫn Studio](docs/UI_STUDIO.md), [toàn bộ preview và kiến trúc animation](docs/ANIMATION_BANK.md). Hai thử nghiệm ban đầu [Coffee](docs/COFFEE_PLAYBACK.md) và [Printer check](docs/PRINTER_PLAYBACK.md) được giữ làm tài liệu tham khảo.
+
+<a id="quick-start"></a>
+
+## 🚀 Bắt đầu
+
+### 1. Chuẩn bị
+
+- **ESP-IDF 5.5.4**, target ESP32-S3; dependency ghim trong [`dependencies.lock`](dependencies.lock).
+- Board **16 MB flash, 8 MB octal PSRAM**, LCD và âm thanh theo [cấu hình phần cứng](main/boards/bambu-deskbot/config.h).
+- Cáp USB dữ liệu và cổng **USB-UART** của Desk-bot. GPIO19/20 đang dùng cho âm thanh, cũng là chân USB native của ESP32-S3.
+
+### 2. Tải mã nguồn và build
+
+```sh
+git clone https://github.com/Hdchipeo/bambu-bot.git
+cd bambu-bot
 . "$HOME/esp/esp-idf/export.sh"
 idf.py set-target esp32s3
 idf.py build
+```
+
+Chỉ chạy `set-target` khi thiết lập checkout mới; thao tác này có thể đặt lại cấu hình `menuconfig` của bản build đang dùng.
+
+Checkout mới chạy **demo dữ liệu A1** khi chưa có cấu hình LAN riêng. Tiến độ demo lặp theo chu kỳ 120 giây. LCD 280×240 không hiện chữ “Demo”, nên hãy kiểm tra profile build khi đánh giá dữ liệu.
+
+### 3. Nạp và thiết lập hội thoại
+
+```sh
 idf.py -p /dev/cu.YOUR_ESP32_PORT flash monitor
 ```
 
-Build mặc định chạy demo, không cần cấu hình máy in. Màn 280×240 không có nhãn DEMO theo thiết kế; dữ liệu trong bản build demo này vẫn hoàn toàn giả lập. Chọn đúng cổng serial của board; mic/loa của cấu hình test dùng GPIO19/20 nên lưu ý đây cũng là chân USB native của ESP32-S3. Thực hiện nạp theo cổng USB-UART và cách đấu dây đang có trên Desk-bot, không đổi dây theo sơ đồ Waveshare.
+Thay cổng serial bằng cổng thực tế. Lệnh `flash` nạp cả app và `generated_assets.bin`; cần giữ hai file cùng bản để dùng decoder và bank animation tương ứng.
 
-Sau khi nạp, thiết lập Wi-Fi theo luồng XiaoZhi; nhấn BOOT trong lúc khởi động để vào cấu hình khi cần. Nhấn ngắn BOOT khi chạy bình thường bật/tắt hội thoại. **Nhấn giữ BOOT** đổi giữa nền đen/nét xanh Bambu và nền xanh Bambu/nét trắng; lựa chọn được lưu qua khởi động lại. MCP `self.screen.set_theme`: `dark` là đen/xanh, `light` là xanh/trắng. Nếu dùng server mặc định, hoàn tất kích hoạt thiết bị theo mã hiển thị. Giao diện tiếng Việt không tự đặt ngôn ngữ ASR/TTS: cần chọn giọng và cấu hình trợ lý tiếng Việt trên server.
+Sau khi nạp, thiết lập Wi-Fi theo luồng XiaoZhi và hoàn tất kích hoạt bằng mã hiển thị nếu server yêu cầu. Nhấn BOOT lúc khởi động để vào cấu hình khi cần.
 
-Hỏi “Máy in đang in đến đâu?” và yêu cầu trợ lý gọi `self.bambu.get_printer_status`. Trong demo, trợ lý phải nói rõ dữ liệu giả lập. Có prompt tham khảo trong [hướng dẫn test](docs/TESTING.md).
+| Thao tác | Chức năng |
+| :--- | :--- |
+| Nhấn ngắn **BOOT** khi chạy | Bật / tắt hội thoại |
+| Nhấn giữ **BOOT** | Đổi theme; lưu lựa chọn qua khởi động lại |
+| MCP `self.screen.set_theme` | `dark`: đen/xanh · `light`: xanh/trắng |
 
-## Kết nối A1 thật
+Muốn hội thoại tiếng Việt, chọn ngôn ngữ ASR, TTS và prompt trợ lý trên server. Ngôn ngữ giao diện không tự thay cấu hình giọng nói.
+
+### Custom wake word
+
+Với ESP32-S3 / 8 MB PSRAM, **MN7 English** là lựa chọn ưu tiên khi bật custom wake word theo tiếng Anh. Bộ assets mới đã build thành công cùng custom wake word + MN7. MultiNet không phải model tiếng Việt; cụm “bam bu” cần thử nhận dạng thực tế khi quạt/máy in đang chạy. Xem [so sánh model và ngân sách bộ nhớ](docs/ANIMATION_BANK.md#custom-wake-word-và-multinet).
+
+<a id="printer"></a>
+
+## 🖨️ Kết nối Bambu Lab A1
 
 ```sh
 cp bambu.example.json bambu.local.json
@@ -68,39 +146,144 @@ idf.py build
 idf.py -p /dev/cu.YOUR_ESP32_PORT flash monitor
 ```
 
-`bambu.local.json`, CA PEM và header sinh ra đều bị Git bỏ qua. Không chia sẻ firmware build với thông tin xác thực cá nhân. Lấy CA PEM phù hợp từ nguồn tin cậy của cấu hình máy in; client kiểm tra chuỗi chứng chỉ bằng CA cung cấp, bỏ kiểm tra hostname vì kết nối bằng IP. Chưa có chế độ tự khám phá máy in hoặc thu thập chứng chỉ.
+Điền IP, serial, access code và CA PEM phù hợp với máy in của bạn. Client xác thực chuỗi chứng chỉ bằng CA cung cấp, bỏ kiểm tra hostname vì kết nối bằng IP. Cần bảo đảm firmware/cấu hình LAN A1 cho phép MQTT; hiện chưa có tự khám phá máy in hoặc thu thập chứng chỉ.
 
-Chỉ subscribe `device/<serial>/report` và gửi yêu cầu telemetry `pushall`; không gửi lệnh điều khiển in. Dữ liệu không có là `null`, trường quá 30 giây được đánh dấu stale. Cần kiểm tra firmware/cấu hình LAN A1 cho phép truy cập MQTT.
+`bambu.local.json`, CA PEM và header sinh ra được Git bỏ qua. **Binary build với cấu hình LAN chứa thông tin xác thực cá nhân; không đưa lên release công khai.**
 
-Để quay lại demo: đặt `demo=true` trong file cục bộ và chạy lại `configure.py`, hoặc xóa `main/bambu/local_config.h`, rồi build/nạp lại.
+Robot subscribe `device/<serial>/report` và gửi yêu cầu telemetry `pushall`. Bản hiện tại không gửi lệnh điều khiển in. Trường chưa có dữ liệu là `null`; trường quá 30 giây được đánh dấu stale.
 
-## Server AI
+> **Thử bằng giọng nói:** “Máy in đang in đến đâu?” — cấu hình trợ lý gọi `self.bambu.get_printer_status`. Khi dùng demo, trợ lý cần nói rõ dữ liệu giả lập.
 
-Có thể thử với dịch vụ discovery mặc định của XiaoZhi, hoặc tự host [xiaozhi-esp32-server](https://github.com/xinnan-tech/xiaozhi-esp32-server). Dự án này chưa đóng gói hay triển khai server.
+Để quay lại demo, đặt `demo=true` và chạy lại `configure.py`, hoặc xóa `main/bambu/local_config.h`, rồi build/nạp lại. Xem [hướng dẫn thử nghiệm](docs/TESTING.md) để kiểm tra live/stale/offline và prompt mẫu.
 
-Với server riêng, đặt `ota_url` trong file cục bộ thành URL **OTA discovery của server XiaoZhi**, không phải URL WebSocket hay file firmware. Khi khởi động, giá trị được ghi vào NVS `wifi/ota_url`. Xóa giá trị trong JSON không xóa cấu hình NVS cũ; đổi sang URL mong muốn và tạo lại header. Robot vẫn dùng discovery để lấy endpoint hội thoại nhưng bỏ qua đề nghị cập nhật firmware tự động, tránh bị thay bằng firmware upstream.
+<a id="architecture"></a>
 
-## Kiểm tra và tài liệu
+## 🧩 Kiến trúc & bộ nhớ
 
-```sh
-python3 scripts/test_host.py
+```mermaid
+flowchart LR
+    A1["Bambu Lab A1"] -->|"MQTT TLS / LAN"| Parser["Parser telemetry"]
+    Parser --> State["Trạng thái máy in"]
+    State --> UI["LVGL · Animation + HUD"]
+    State --> Events["Popup + âm báo"]
+    State --> MCP["MCP: trạng thái máy in"]
+    Mic["Mic I2S"] --> Voice["XiaoZhi voice client"]
+    Voice <-->|"Hội thoại / công cụ"| AI["Server AI"]
+    MCP <--> Voice
+    Voice --> Speaker["Loa I2S"]
+    Voice -->|"Biểu cảm hội thoại"| UI
+    Bank["Bank frame trong flash"] --> UI
+    Shared["Mã UI dùng chung"] --> UI
+    Shared --> Studio["macOS · LVGL + SDL2"]
 ```
 
-Host test biên dịch chính parser firmware với AddressSanitizer/UndefinedBehaviorSanitizer; dùng cJSON có sẵn trong ESP-IDF, hoặc `libcjson-dev` qua pkg-config. CI chạy kiểm tra này trên GitHub.
+LCD **280×240** dùng frame dựng sẵn thay cho dựng hình 3D mỗi frame trên ESP32. Bank v3 lưu chung hình dạng của hai theme và bảng màu RGB565 riêng, nén zlib **không mất dữ liệu**. Mỗi frame độc lập; bỏ frame trễ theo thời gian thay vì tạo hàng đợi. HUD nhiệt độ, chữ và tiến độ vẫn do LVGL vẽ riêng.
 
-- [Hướng dẫn thử nghiệm và trạng thái kiểm chứng](docs/TESTING.md)
-- [Nguồn mã và nguồn định nghĩa phần cứng](docs/UPSTREAM.md)
-- [Thiết kế sản phẩm đầy đủ](docs/PROJECT_PLAN.md) — phần kiến trúc mục tiêu, gồm AMOLED, Wiki và servo ở các giai đoạn sau.
+| Thành phần | Dung lượng / hành vi hiện tại |
+| :--- | :--- |
+| **Bank animation v3** | **3.602.446 byte**, 32 clip × 2 theme, 5.756 tham chiếu frame |
+| **Hai buffer RGB565 dùng chung** | **136.160 byte**, không tăng theo số cảnh |
+| **Scratch giải mã palette** | **34.886 byte**, dùng lại giữa các frame |
+| **Assets với custom wake word + MN7 English** | **7.284.197 byte**, còn **1.104.411 byte** trong phân vùng 8 MiB |
+| **App cùng cấu hình MN7** | **0x354250 byte**, còn **15%** slot ứng dụng |
+| **Nhịp phát mục tiêu** | **50 ms/frame → 20 FPS**; chưa đo FPS LCD khi chạy đồng thời MN7 |
+| **Dự phòng** | Thiếu/hỏng bank → renderer CPU 140×120, target 100 ms/frame |
 
-Tham khảo giao thức/trạng thái từ [PrintSphere](https://github.com/cptkirki/PrintSphere). Client A1 trong bản này được viết riêng; không chép mã PrintSphere. Nếu tích hợp mã upstream đó về sau, cần tuân theo [giấy phép FNCL v1.1](https://github.com/cptkirki/PrintSphere/blob/main/LICENSE).
+Dung lượng trên thuộc build đã kiểm tra với cấu hình model tương ứng; thay model/font sẽ thay kích thước assets. Giữ nguyên bảng phân vùng **hai slot OTA + assets 8 MiB**, NVS và pinout. Kiểm tra dung lượng assets chạy trước khi flash để chặn gói vượt phân vùng.
 
-### Coffee animation playback experiment
+<a id="hardware"></a>
 
-The 280×240 coffee scene now uses pre-rendered 3D frames and native LVGL telemetry,
-with a 20 FPS target. Try `./scripts/run_simulator.sh --coffee-demo`.
-See [the experiment and preview](docs/COFFEE_PLAYBACK.md) for the isolated demo
-firmware profile, memory budget and verification limits.
+## 🔧 Phần cứng
 
-Printer check also has a pre-rendered 280×240 experiment, alongside Coffee.
-Try `./scripts/run_simulator.sh --printer-demo`; see
-[the preview and firmware profile](docs/PRINTER_PLAYBACK.md).
+| Thành phần | Bản mẫu hiện tại | Hướng phát triển |
+| :--- | :--- | :--- |
+| **Vi điều khiển** | ESP32-S3 dual-core 240 MHz; flash 16 MB, PSRAM 8 MB | Giữ nền ESP32-S3 |
+| **Màn hình** | ST7789 vật lý 240×280, giao diện ngang 280×240, SPI 40 MHz | Waveshare ESP32-S3-Touch-AMOLED-1.75, tròn 466×466 |
+| **Âm thanh** | Mic I2S 16 kHz, loa I2S 24 kHz | Mic trên board AMOLED sau khi tích hợp |
+| **Điều khiển** | Nút BOOT, backlight LCD | Touch sau khi tích hợp board mới |
+| **Servo hai trục** | Chưa bật; cấu hình nguồn không định nghĩa chân servo | Bổ sung sau khi chốt phần cứng |
+
+Nguồn định nghĩa chân là [`main/boards/bambu-deskbot/config.h`](main/boards/bambu-deskbot/config.h), nhập nguyên từ `config.h` của Desk-bot. Không nhập mã ứng dụng, camera hay cấu hình dịch vụ của Desk-bot; không tự gán chân servo hoặc bật GPIO đèn mẫu của upstream. Xem [nguồn phần cứng và phần mềm](docs/UPSTREAM.md).
+
+## 🗣️ Server AI & MCP
+
+Có thể thử với dịch vụ discovery mặc định của XiaoZhi hoặc tự host [xiaozhi-esp32-server](https://github.com/xinnan-tech/xiaozhi-esp32-server). Repo này chứa firmware và simulator; chưa đóng gói hay triển khai server AI.
+
+| Công cụ MCP | Vai trò |
+| :--- | :--- |
+| `self.bambu.get_printer_status` | Đọc trạng thái máy in cho trợ lý AI |
+| `self.screen.set_theme` | Chuyển hai theme của Bambu Bot |
+| `self.screen.set_brightness` | Chỉnh độ sáng màn hình |
+| `self.audio_speaker.set_volume` | Chỉnh âm lượng loa |
+
+Với server riêng, đặt `ota_url` trong JSON cục bộ thành URL **OTA discovery XiaoZhi**, không phải URL WebSocket hoặc file firmware. Khi khởi động, giá trị được ghi vào NVS `wifi/ota_url`; xóa trường JSON không xóa giá trị NVS cũ. Muốn đổi server, đặt URL mong muốn và tạo lại header.
+
+Robot dùng discovery để lấy endpoint/kích hoạt hội thoại, đồng thời bỏ qua đề nghị tự cập nhật firmware upstream để giữ bản Bambu Bot.
+
+## 🧪 Kiểm thử
+
+```sh
+# Parser telemetry và kiểm tra cấu hình trên host
+python3 scripts/test_host.py
+
+# Build và chạy kiểm thử simulator / codec animation
+./scripts/run_simulator.sh --build-only
+ctest --test-dir simulator/build --output-on-failure
+
+# Kiểm tra bank trong ảnh assets sau khi build firmware
+python3 scripts/verify_animation_assets.py build/generated_assets.bin
+```
+
+Parser host được kiểm tra với AddressSanitizer/UndefinedBehaviorSanitizer; dùng cJSON trong ESP-IDF hoặc `libcjson-dev` qua pkg-config. Simulator kiểm tra toàn bộ frame, đổi cảnh/theme, ưu tiên trạng thái, dữ liệu hỏng và fallback. CI chạy [host tests](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml) và [simulator tests](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml).
+
+Bank v3 đã đối chiếu **5.756 frame khớp từng pixel RGB565 với bank v2**; Release, ASan/UBSan và build ESP32-S3 + MN7 đã qua. Đây chưa phải kiểm chứng FPS LCD, chất lượng wake word hoặc độ ổn định chạy dài trên thiết bị.
+
+## 📂 Cấu trúc dự án
+
+```text
+bambu-bot/
+├── main/
+│   ├── bambu/                  # Dịch vụ A1, parser telemetry, cấu hình LAN cục bộ
+│   ├── boards/bambu-deskbot/    # Pinout, màn hình và tích hợp Desk-bot
+│   ├── audio/                  # Mic/loa, wake word và xử lý âm thanh
+│   └── display/                # Hạ tầng hiển thị XiaoZhi / LVGL
+├── ui/                         # UI dùng chung giữa firmware và simulator
+│   ├── animation_assets/       # Bank frame dựng sẵn cho LCD 280×240
+│   └── assets/                 # Manifest và tài nguyên UI
+├── simulator/                  # Emotion Studio trên macOS / SDL2
+├── scripts/                    # Cấu hình, tạo assets, kiểm tra và đóng gói
+├── tests/                      # Kiểm thử parser, cấu hình và codec
+├── partitions/                 # Bảng phân vùng ESP-IDF
+└── docs/                       # Hướng dẫn, kiến trúc và preview
+```
+
+## 🛠️ Lộ trình
+
+- [x] Hội thoại XiaoZhi và MCP đọc trạng thái máy in.
+- [x] Kết nối MQTT TLS và xác nhận telemetry A1 thật.
+- [x] Emotion Studio macOS, hai theme và hai kích thước màn hình.
+- [x] Đầu robot 3D: 18 kịch bản + 14 biểu cảm, bank v3 vừa flash cùng MN7.
+- [x] Popup/âm báo hoàn tất hoặc lỗi máy in.
+- [ ] Đo FPS, tải CPU/RAM và độ ổn định khi animation + voice + MQTT cùng chạy.
+- [ ] Thông báo chủ động bằng giọng nói, giải mã HMS và tra cứu Bambu Wiki bằng RAG.
+- [ ] Tích hợp AMOLED tròn 1.75 và servo hai trục trên phần cứng hoàn chỉnh.
+- [ ] Lưu chống lặp sự kiện qua reboot và kiểm thử chạy dài.
+
+<a id="documentation"></a>
+
+## 📚 Tài liệu & nguồn tham khảo
+
+| Tài liệu | Nội dung |
+| :--- | :--- |
+| [Emotion Studio](docs/UI_STUDIO.md) | Chạy simulator, chọn màn hình, emotion và theme |
+| [Animation bank](docs/ANIMATION_BANK.md) | Preview, codec v3, ngân sách bộ nhớ và chọn MultiNet |
+| [Thử nghiệm & kiểm chứng](docs/TESTING.md) | Kết nối, prompt MCP, dữ liệu demo/live/stale |
+| [Nguồn upstream](docs/UPSTREAM.md) | Nguồn mã, nguồn định nghĩa phần cứng |
+| [Kế hoạch sản phẩm](docs/PROJECT_PLAN.md) | Kiến trúc mục tiêu: Wiki, AMOLED và servo |
+| [Releases](https://github.com/Hdchipeo/bambu-bot/releases) | Các bản firmware demo và simulator đã đóng gói |
+
+Nền firmware lấy từ [XiaoZhi ESP32](https://github.com/78/xiaozhi-esp32), commit `49ac8a6da399f27a9546d4f73640b7f86c24bac6` (v2.2.6). Tham khảo giao thức/trạng thái từ [PrintSphere](https://github.com/cptkirki/PrintSphere); client A1 trong repo này được viết riêng, không chép mã PrintSphere. Nếu tích hợp mã PrintSphere về sau, cần tuân theo [giấy phép FNCL v1.1](https://github.com/cptkirki/PrintSphere/blob/main/LICENSE).
+
+## 📄 Giấy phép
+
+Mã nguồn theo [MIT License](LICENSE), giữ thông tin bản quyền upstream. Các dependency áp dụng giấy phép tương ứng của từng dự án.
