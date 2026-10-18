@@ -3,6 +3,7 @@
 #include "printer_icon.h"
 #include "coffee_clip.h"
 #include "printer_clip.h"
+#include "animation_bank.h"
 #include <memory>
 #include <array>
 #include <cstddef>
@@ -14,8 +15,8 @@ enum class Scene { Game, Coffee, Music, Explore, Nap, Fly, Printer, Complete, Ra
 struct SceneInfo { const char* name; const char* description; };
 const SceneInfo& DescribeScene(Scene scene);
 
-// Experimental CPU mesh rasterizer presented as a dynamic LVGL image. No OpenGL or assets.
-// Real 3D vertices, perspective projection, lighting and per-pixel depth testing.
+// Native RGB565 animation-bank playback on 280x240, with an XYZ CPU mesh
+// renderer for other displays, source capture and missing/corrupt asset fallback.
 class SceneView {
 public:
     SceneView(lv_obj_t* parent,int width,int height,bool round,int render_divisor=1,uint32_t frame_period_ms=33);
@@ -36,10 +37,14 @@ public:
     size_t primitive_count() const { return count_; }
     size_t raster_storage_bytes() const { return pixels_.size()*sizeof(uint32_t)+depth_.size()*sizeof(float); }
     bool overflowed() const { return overflow_; }
+    void EnableAllPlayback(bool enabled) { bank_enabled_=enabled; RenderAt(elapsed_); }
+    void SetHeadOnly(bool value) { if(head_only_==value)return;head_only_=value;RenderAt(elapsed_); }
     void EnableCoffeePlayback(bool enabled);
-    bool coffee_playback_active() const { return clip_active_ && scene_==Scene::Coffee; }
+    bool coffee_playback_active() const { return clip_active_ && clip_id_==static_cast<int>(Scene::Coffee); }
     void EnablePrinterPlayback(bool enabled);
-    bool printer_playback_active() const { return clip_active_ && scene_==Scene::Printer; }
+    bool printer_playback_active() const { return clip_active_ && clip_id_==static_cast<int>(Scene::Printer); }
+    bool playback_active() const { return clip_active_; }
+    int playback_id() const { return clip_id_; }
     size_t playback_buffer_bytes() const { return (clip_pixels_[0].capacity()+clip_pixels_[1].capacity())*sizeof(uint16_t); }
     size_t coffee_buffer_bytes() const { return (clip_pixels_[0].size()+clip_pixels_[1].size())*sizeof(uint16_t); }
     uint32_t playback_frame() const { return clip_frame_; }
@@ -72,8 +77,11 @@ private:
     lv_obj_t* clip_image_=nullptr;
     std::array<lv_image_dsc_t,2> clip_images_{};
     std::array<std::vector<uint16_t>,2> clip_pixels_;
+    bool bank_enabled_=true,head_only_=false;
     bool coffee_enabled_=true,printer_enabled_=true,clip_active_=false;
     Scene clip_scene_=Scene::Coffee;
+    int clip_id_=-1,failed_clip_=-1;
+    uint32_t bank_generation_=0;
     int clip_buffer_=0;
     uint32_t clip_frame_=UINT32_MAX,frame_period_ms_=33;
     ui::Theme clip_theme_=ui::Theme::Black;

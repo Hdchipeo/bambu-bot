@@ -33,9 +33,16 @@ Script build chế độ Release và mở ứng dụng. Nếu đã có bản đ�
 
 Nếu chưa build firmware và chưa có `managed_components/lvgl__lvgl`, CMake tự tải LVGL tag `v9.5.0`. Có thể chỉ định nguồn sẵn có bằng `-DBAMBU_LVGL_DIR=/absolute/path/to/lvgl`. LVGL source phải đúng 9.5.0.
 
+## Bộ 3D đầy đủ — 0.4.0
+
+**3D scenes / D** mở 18 kịch bản; **3D heads / E** mở 14 biểu cảm phần đầu.
+Trên Desk-bot 280×240, cả hai dùng bank RGB565 dựng sẵn và HUD LVGL độc lập.
+Thử nhanh `./scripts/run_simulator.sh --all-demo` hoặc `--heads-demo`.
+Xem [preview, bộ nhớ và firmware](ANIMATION_BANK.md).
+
 ## Điều khiển
 
-Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản cũ, thoát cửa sổ cũ rồi mở lại bản **0.3.3**; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
+Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản cũ, thoát cửa sổ cũ rồi mở lại bản **0.4.0**; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
 
 | Thao tác | Kết quả |
 | --- | --- |

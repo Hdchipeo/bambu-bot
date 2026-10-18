@@ -513,7 +513,8 @@ elseif(CONFIG_BOARD_TYPE_ESP_P4_FUNCTION_EV_BOARD)
     set(BOARD_TYPE "esp-p4-function-ev-board")
 elseif(CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD)
     set(BOARD_TYPE "bambu-deskbot")
-    list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../ui/bambu_face.cc" "${CMAKE_CURRENT_SOURCE_DIR}/../ui/scene3d.cc" "${CMAKE_CURRENT_SOURCE_DIR}/../ui/coffee_clip.cc" "${CMAKE_CURRENT_SOURCE_DIR}/../ui/printer_clip.cc")
+    set(DEFAULT_ASSETS_EXTRA_FILES "${PROJECT_DIR}/ui/animation_assets")
+    list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../ui/bambu_face.cc" "${CMAKE_CURRENT_SOURCE_DIR}/../ui/scene3d.cc" "${CMAKE_CURRENT_SOURCE_DIR}/../ui/animation_bank.cc")
     list(APPEND INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/../ui")
     set(BUILTIN_TEXT_FONT font_puhui_basic_16_4)
     set(BUILTIN_ICON_FONT font_awesome_16_4)
@@ -1102,6 +1103,10 @@ function(build_default_assets_bin)
     list(APPEND BUILD_ARGS "--esp_sr_model_path" "${ESP_SR_MODEL_PATH}")
     list(APPEND BUILD_ARGS "--xiaozhi_fonts_path" "${XIAOZHI_FONTS_PATH}")
 
+    set(BAMBU_ANIMATION_DEPENDENCY "")
+    if(BOARD_TYPE STREQUAL "bambu-deskbot")
+        set(BAMBU_ANIMATION_DEPENDENCY "${PROJECT_DIR}/ui/animation_assets/animations.bba")
+    endif()
     # Create custom command to build assets
     add_custom_command(
         OUTPUT ${GENERATED_ASSETS_BIN}
@@ -1109,6 +1114,7 @@ function(build_default_assets_bin)
         DEPENDS
             ${SDKCONFIG}
             ${PROJECT_DIR}/scripts/build_default_assets.py
+            ${BAMBU_ANIMATION_DEPENDENCY}
         COMMENT "Building default assets.bin based on configuration"
         VERBATIM
     )
@@ -1223,4 +1229,11 @@ if(BAMBU_PRINTER_PREVIEW)
 endif()
 if(BAMBU_PRINTER_PREVIEW AND BAMBU_COFFEE_PREVIEW)
     message(FATAL_ERROR "Select only one animation preview profile")
+endif()
+
+if(BAMBU_ANIMATION_PREVIEW)
+    if(NOT BAMBU_FORCE_DEMO OR BAMBU_COFFEE_PREVIEW OR BAMBU_PRINTER_PREVIEW)
+        message(FATAL_ERROR "Full animation preview requires BAMBU_FORCE_DEMO=ON and other previews OFF")
+    endif()
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE BAMBU_ANIMATION_PREVIEW=1)
 endif()

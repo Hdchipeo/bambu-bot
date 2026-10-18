@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(BambuBotStudio VERSION 0.3.5 LANGUAGES C CXX ASM)
+project(BambuBotStudio VERSION 0.4.0 LANGUAGES C CXX ASM)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +21,7 @@ if(NOT BAMBU_LVGL_DIR)
     endif()
 endif()
 
+find_package(ZLIB REQUIRED)
 find_package(SDL2 CONFIG REQUIRED HINTS /opt/homebrew/lib/cmake/SDL2 /usr/local/lib/cmake/SDL2)
 
 # Only core sources, no demos or platform drivers. Ignore AppleDouble metadata on external drives.
@@ -34,9 +35,9 @@ target_compile_definitions(bambu_lvgl PUBLIC
     LV_KCONFIG_IGNORE LV_LVGL_H_INCLUDE_SIMPLE)
 target_compile_options(bambu_lvgl PRIVATE -Wno-deprecated-declarations)
 
-add_library(bambu_face STATIC ../ui/bambu_face.cc ../ui/scene3d.cc ../ui/coffee_clip.cc ../ui/printer_clip.cc)
+add_library(bambu_face STATIC ../ui/bambu_face.cc ../ui/scene3d.cc ../ui/coffee_clip.cc ../ui/printer_clip.cc ../ui/animation_bank.cc)
 target_include_directories(bambu_face PUBLIC ../ui)
-target_link_libraries(bambu_face PUBLIC bambu_lvgl)
+target_link_libraries(bambu_face PUBLIC bambu_lvgl ZLIB::ZLIB)
 target_compile_options(bambu_face PRIVATE -Wall -Wextra -Werror)
 
 add_executable(bambu_studio MACOSX_BUNDLE main.cc)
@@ -59,3 +60,5 @@ endif()
 enable_testing()
 add_test(NAME emotion-studio-smoke COMMAND bambu_studio --self-test)
 set_tests_properties(emotion-studio-smoke PROPERTIES TIMEOUT 180)
+
+target_compile_definitions(bambu_studio PRIVATE BAMBU_BANK_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../ui/animation_assets/animations.bba")

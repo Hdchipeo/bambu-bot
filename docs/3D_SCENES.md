@@ -1,5 +1,7 @@
 # Bambu Bot — 3D idle stories
 
+**Cập nhật 0.4.0:** 18 cảnh và 14 biểu cảm đầu robot đã có bank animation dựng sẵn cho 280×240. Xem [ANIMATION_BANK.md](ANIMATION_BANK.md). Phần mô tả CPU renderer bên dưới là nền hình học dùng để tạo dữ liệu và dự phòng.
+
 Bản thử nghiệm **Emotion Studio 0.3.3**, triển khai trước trên simulator macOS. Bấm **3D scenes** hoặc **D** để chuyển từ bộ 14 emotion 2D sang bộ 18 hoạt cảnh 3D. Chọn một cảnh để chạy phần mở đầu: mặt phẳng dần có độ dày, đầu robot lớn hơn được đặt giữa màn hình và đạo cụ xuất hiện trong **1,2 giây**, sau đó bot bắt đầu hoạt động.
 
 Từ **0.3.1**, robot chỉ có **phần đầu**; đã bỏ toàn bộ thân, tay, bàn tay, chân và bàn chân. Đầu được phóng lớn, đặt lại gần giữa màn hình; đạo cụ vẫn chuyển động độc lập quanh đầu.

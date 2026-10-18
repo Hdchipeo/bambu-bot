@@ -2,12 +2,26 @@
 #include "scene_policy.h"
 #include "application.h"
 #include "settings.h"
+#include "assets.h"
 #include "lvgl_theme.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
+
+namespace {
+void LoadAnimationBank(bool available) {
+    void* ptr=nullptr;size_t bytes=0;
+    if(available && Assets::GetInstance().GetAssetData("animations.bba",ptr,bytes) &&
+       bambu::ui::AnimationBank::SetData(static_cast<const uint8_t*>(ptr),bytes))return;
+    bambu::ui::AnimationBank::SetData(nullptr,0);
+}
+}
+void BambuDisplay::ReloadAnimationBank(bool available) {
+    DisplayLockGuard lock(this);LoadAnimationBank(available);
+    if(scene_)scene_->RenderAt(scene_->elapsed());
+}
 
 BambuDisplay::~BambuDisplay() {
     DisplayLockGuard lock(this);
@@ -24,10 +38,11 @@ void BambuDisplay::SetupUI() {
     scene_theme_ = settings.GetString("theme", "dark") == "light" ? bambu::ui::Theme::Green : bambu::ui::Theme::Black;
     current_theme_ = LvglThemeManager::GetInstance().GetTheme(scene_theme_ == bambu::ui::Theme::Green ? "light" : "dark");
     auto screen = lv_display_get_screen_active(display_);
+    LoadAnimationBank(true);
     scene_ = std::make_unique<bambu::ui::SceneView>(screen, width_, height_, width_ == height_, 2, 100);
     ESP_LOGI("BambuDisplay", "3D head UI: %dx%d raster, %dx%d native HUD; 100 ms frame target", width_/2, height_/2, width_, height_);
-    ESP_LOGI("BambuDisplay", "Coffee clip: 20 FPS target, %u flash bytes, cropped RGB565 double buffer", static_cast<unsigned>(bambu::ui::CoffeeClip::FlashBytes()));
-    ESP_LOGI("BambuDisplay", "Printer check clip: 20 FPS target, %u flash bytes; shared RGB565 buffers", static_cast<unsigned>(bambu::ui::PrinterClip::FlashBytes()));
+    ESP_LOGI("BambuDisplay", "Animation bank: %u bytes; 18 scenes / 14 emotions; 20 FPS target; %u decoded buffer bytes",
+        static_cast<unsigned>(bambu::ui::AnimationBank::Size()),static_cast<unsigned>(bambu::ui::AnimationBank::MaxPixels()*4));
     // Retain the upstream multilingual font for provisioning, activation and chat.
     message_panel_ = lv_obj_create(screen);
     lv_obj_remove_style_all(message_panel_);
@@ -90,6 +105,18 @@ void BambuDisplay::Refresh() {
     if (printer_preview) emotion = Emotion::Idle;
 #endif
     const uint32_t now = lv_tick_get();
+    bool all_preview=false,preview_head=false;
+    uint32_t preview_id=0;
+#ifdef BAMBU_ANIMATION_PREVIEW
+    all_preview=printer_.demo && device==kDeviceStateIdle && requested_==Emotion::Idle && !sleeping_ &&
+                (emotion==Emotion::Idle || emotion==Emotion::Printing);
+    if(all_preview){
+        if(!animation_preview_started_)animation_preview_started_=now;
+        preview_id=((now-animation_preview_started_)/7500)%32;preview_head=preview_id>=18;
+        emotion=preview_head?static_cast<Emotion>(preview_id-18):Emotion::Idle;
+    }
+#endif
+    scene_->SetHeadOnly(preview_head);
     if(emotion==Emotion::Idle && active_emotion_!=Emotion::Idle)idle_started_=now;
     active_emotion_=emotion;
     const auto printer_state=printer_.state.value.value_or("");
@@ -98,6 +125,7 @@ void BambuDisplay::Refresh() {
         emotion==Emotion::Printing ? printer_state=="RUNNING"||printer_state=="PREPARE" :
         emotion==Emotion::Warning && printer_state=="PAUSE";
     auto selected=printer_preview?bambu::ui::Scene::Printer:coffee_preview?bambu::ui::Scene::Coffee:bambu::ui::AutomaticScene(emotion,(now-idle_started_)/12000,printer_visual);
+    if(all_preview)selected=preview_head?bambu::ui::Scene::Game:static_cast<bambu::ui::Scene>(preview_id);
     if(selected!=active_scene_){active_scene_=selected;scene_->SetScene(selected);if(sleeping_)scene_->RenderAt(2500);}
     scene_->SetEmotion(emotion);
     if (!notification_.empty() && now - notification_started_ >= notification_duration_) notification_.clear();

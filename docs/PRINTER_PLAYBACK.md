@@ -1,5 +1,8 @@
 # Printer check — pre-rendered 3D playback experiment
 
+> Superseded by [the full 0.4.0 animation bank](ANIMATION_BANK.md): all 18 scenes and 14 head expressions now use assets storage. The budgets below describe the earlier standalone experiment.
+
+
 ![Printer check in both themes](ui/printer-playback.gif)
 
 The 280×240 **Printer check** scene now uses the same RGB565/PackBits playback

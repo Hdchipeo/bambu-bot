@@ -1,5 +1,8 @@
 # Coffee animation experiment — Desk-bot 280×240
 
+> Superseded by [the full 0.4.0 animation bank](ANIMATION_BANK.md): all 18 scenes and 14 head expressions now use assets storage. The budgets below describe the earlier standalone experiment.
+
+
 ![Pre-rendered coffee in both themes](ui/coffee-playback.gif)
 
 The coffee scene now plays pre-rendered geometry at a **50 ms target (20 FPS)** on

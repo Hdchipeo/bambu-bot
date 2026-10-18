@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
+from verify_animation_assets import verify_bank
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -33,6 +34,7 @@ def copy_clean(source, target):
 
 
 def main():
+    verify_bank((ROOT / "ui/animation_assets/animations.bba").read_bytes())
     source = ROOT / "simulator/build/bambu_studio.app"
     with (source / "Contents/Info.plist").open("rb") as info:
         version = plistlib.load(info)["CFBundleShortVersionString"]
@@ -64,6 +66,7 @@ def main():
                 raise SystemExit("Unexpected unbundled dependency remains.")
         resources = staged / "Contents/Resources"
         resources.mkdir(exist_ok=True)
+        (resources / "animations.bba").write_bytes((ROOT / "ui/animation_assets/animations.bba").read_bytes())
         for notice in (ROOT / "simulator/licenses").iterdir():
             if notice.is_file() and not notice.name.startswith("._"):
                 (resources / notice.name).write_bytes(notice.read_bytes())

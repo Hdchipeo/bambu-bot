@@ -49,13 +49,14 @@ SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round,int render_divisor,
  lv_obj_set_style_bg_opa(root_,LV_OPA_COVER,0);
  lv_obj_remove_flag(root_,static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_SCROLLABLE|LV_OBJ_FLAG_CLICKABLE));
  lv_obj_add_event_cb(root_,[](lv_event_t* e){static_cast<SceneView*>(lv_event_get_user_data(e))->Draw(lv_event_get_layer(e));},LV_EVENT_DRAW_MAIN,this);
- clip_image_=lv_image_create(root_);lv_obj_set_pos(clip_image_,CoffeeClip::X(),CoffeeClip::Y());
+ clip_image_=lv_image_create(root_);lv_obj_set_pos(clip_image_,0,44);
  lv_obj_add_flag(clip_image_,LV_OBJ_FLAG_HIDDEN);lv_obj_remove_flag(clip_image_,LV_OBJ_FLAG_CLICKABLE);
  title_=lv_label_create(root_);footer_=lv_label_create(root_);
  for(auto label:{title_,footer_}) {
   lv_obj_set_style_text_font(label,w<320?&lv_font_montserrat_12:&lv_font_montserrat_14,0);
   lv_obj_set_style_text_align(label,LV_TEXT_ALIGN_CENTER,0);lv_obj_set_width(label,static_cast<int>(240*scale_));
  }
+ lv_obj_set_width(footer_,round?static_cast<int>(240*scale_):width_-16);
  lv_obj_align(title_,LV_ALIGN_TOP_MID,0,static_cast<int>((round?36:16)*scale_));
  lv_obj_align(footer_,LV_ALIGN_TOP_MID,0,round?77:31);
  CreateTelemetryHud();
@@ -81,33 +82,38 @@ void SceneView::Restart(){last_tick_=lv_tick_get();RenderAt(0);}
 void SceneView::EnableCoffeePlayback(bool enabled){coffee_enabled_=enabled;RenderAt(elapsed_);}
 void SceneView::EnablePrinterPlayback(bool enabled){printer_enabled_=enabled;RenderAt(elapsed_);}
 void SceneView::UpdatePlayback(){
- const bool printer=scene_==Scene::Printer;
- const bool eligible=printer ? printer_enabled_ && (emotion_==Emotion::Idle||emotion_==Emotion::Printing) :
-     coffee_enabled_ && scene_==Scene::Coffee && emotion_==Emotion::Idle;
- const bool active=eligible && width_==280 && height_==240 && !round_;
- if(active!=clip_active_ || (active && scene_!=clip_scene_)){
-  clip_active_=active;clip_scene_=scene_;clip_frame_=UINT32_MAX;
-  if(timer_)lv_timer_set_period(timer_,active?CoffeeClip::kFrameMs:frame_period_ms_);
+ if(bank_generation_!=AnimationBank::Generation()){bank_generation_=AnimationBank::Generation();failed_clip_=-1;clip_frame_=UINT32_MAX;}
+ const bool activity=!head_only_ && (emotion_==Emotion::Idle || (emotion_==Emotion::Printing&&scene_==Scene::Printer) ||
+     (emotion_==Emotion::Completed&&scene_==Scene::Complete) || (emotion_==Emotion::Error&&scene_==Scene::Error) ||
+     (emotion_==Emotion::Sleepy&&scene_==Scene::Nap));
+ const int id=activity?static_cast<int>(scene_):18+static_cast<int>(emotion_);
+ AnimationBank::Clip clip;
+ const bool enabled=bank_enabled_ && (scene_!=Scene::Coffee||coffee_enabled_) && (scene_!=Scene::Printer||printer_enabled_);
+ const bool active=enabled && width_==280 && height_==240 && !round_ &&
+     failed_clip_!=id*2+(theme_==ui::Theme::Green?1:0) && AnimationBank::Get(id,theme_==ui::Theme::Green,clip);
+ if(active!=clip_active_ || (active && id!=clip_id_)){
+  clip_active_=active;clip_scene_=scene_;clip_id_=active?id:-1;clip_frame_=UINT32_MAX;
+  if(timer_)lv_timer_set_period(timer_,active?50:frame_period_ms_);
   if(!active)lv_obj_add_flag(clip_image_,LV_OBJ_FLAG_HIDDEN);
-  lv_obj_invalidate(root_); // Clear the previous rendering mode exactly once.
+  lv_obj_invalidate(root_);
  }
  if(!active)return;
- const auto frame=printer?PrinterClip::FrameAt(elapsed_):CoffeeClip::FrameAt(elapsed_);
- const int width=printer?PrinterClip::Width():CoffeeClip::Width();
- const int height=printer?PrinterClip::Height():CoffeeClip::Height();
+ const auto frame=AnimationBank::FrameAt(clip,elapsed_);
  if(frame==clip_frame_ && clip_theme_==theme_)return;
  const auto next=1-clip_buffer_;auto& pixels=clip_pixels_[next];
  auto& image=clip_images_[next];lv_image_cache_drop(&image);
- // Reserve once for both clips, so alternating scenes never grows capacity.
- const auto capacity=static_cast<size_t>(std::max(CoffeeClip::Width()*CoffeeClip::Height(),PrinterClip::Width()*PrinterClip::Height()));
+ const auto capacity=AnimationBank::MaxPixels();
  if(pixels.capacity()<capacity)pixels.reserve(capacity);
- pixels.resize(width*height);
- const bool decoded=printer?PrinterClip::Decode(theme_==ui::Theme::Green,frame,pixels.data(),pixels.size()):
-     CoffeeClip::Decode(theme_==ui::Theme::Green,frame,pixels.data(),pixels.size());
- if(!decoded)return;
- lv_obj_set_pos(clip_image_,printer?PrinterClip::X():CoffeeClip::X(),printer?PrinterClip::Y():CoffeeClip::Y());
+ pixels.resize(clip.width*clip.height);
+ if(!AnimationBank::Decode(clip,frame,pixels.data(),pixels.size())){
+  failed_clip_=id*2+(theme_==ui::Theme::Green?1:0);clip_active_=false;clip_id_=-1;
+  lv_obj_add_flag(clip_image_,LV_OBJ_FLAG_HIDDEN);lv_obj_invalidate(root_);
+  if(timer_)lv_timer_set_period(timer_,frame_period_ms_);
+  return;
+ }
+ lv_obj_set_pos(clip_image_,clip.x,clip.y);
  image.header.magic=LV_IMAGE_HEADER_MAGIC;image.header.cf=LV_COLOR_FORMAT_RGB565;
- image.header.w=width;image.header.h=height;image.header.stride=width*2;
+ image.header.w=clip.width;image.header.h=clip.height;image.header.stride=clip.width*2;
  image.data_size=pixels.size()*2;image.data=reinterpret_cast<const uint8_t*>(pixels.data());
  lv_image_set_src(clip_image_,&image);lv_obj_remove_flag(clip_image_,LV_OBJ_FLAG_HIDDEN);
  clip_buffer_=next;clip_frame_=frame;clip_theme_=theme_;
@@ -116,7 +122,7 @@ static void SetLabelIfChanged(lv_obj_t* label,const char* text) {
  if(std::strcmp(lv_label_get_text(label),text)!=0)lv_label_set_text(label,text);
 }
 void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;UpdatePlayback();if(!clip_active_)Build();
- SetLabelIfChanged(title_,emotion_!=Emotion::Idle?Describe(emotion_).name:elapsed<1200?"BAMBU BOT / 2D > 3D":DescribeScene(scene_).name);
+ SetLabelIfChanged(title_,head_only_||emotion_!=Emotion::Idle?Describe(emotion_).name:elapsed<1200?"BAMBU BOT / 2D > 3D":DescribeScene(scene_).name);
  char text[96];
  if(scene_==Scene::Error)std::snprintf(text,sizeof(text),"%sPrinter needs attention",telemetry_.demo?"DEMO / ":"");
  else if(scene_==Scene::Complete)std::snprintf(text,sizeof(text),"%sYour print is ready!",telemetry_.demo?"DEMO / ":"");
@@ -237,23 +243,23 @@ void SceneView::Head(float m,float time){
 }
 void SceneView::Build(){
  count_=0;overflow_=false;float t=elapsed_/1000.f;float u=std::clamp(t/1.2f,0.f,1.f);morph_=u*u*(3-2*u);time_=std::max(0.f,t-1.2f);
- // Coffee loops every 2*pi seconds after the intro, including head yaw and steam.
- if(scene_==Scene::Coffee||scene_==Scene::Printer)time_=std::fmod(time_,2*pi);
+ // Use a common source loop period; the asset exporter samples it at 20 FPS.
+ time_=std::fmod(time_,2*pi);
  float m=morph_,s=std::sin(time_*2),beat=std::sin(time_*5);
- yaw_=m*(.25f+.12f*std::sin(time_*((scene_==Scene::Coffee||scene_==Scene::Printer)?1.f:.9f)));pitch_=m*-.08f;shift_=0;bob_=m*s*2;
- if(scene_==Scene::Fly||scene_==Scene::PaperPlane)yaw_=m*std::sin(time_*1.7f)*.45f;
+ yaw_=m*(.25f+.12f*std::sin(time_));pitch_=m*-.08f;shift_=0;bob_=m*s*2;
+ if(scene_==Scene::Fly||scene_==Scene::PaperPlane)yaw_=m*std::sin(time_)*.45f;
  if(scene_==Scene::Nap)pitch_=m*(.12f+.22f*(s+1));
  if(scene_==Scene::Music||scene_==Scene::Dance){bob_=m*beat*4;pitch_+=m*beat*.08f;}
  if(scene_==Scene::Complete)bob_-=m*std::max(0.f,std::sin(time_*3))*10;
  if(scene_==Scene::Printer||scene_==Scene::Complete||scene_==Scene::Error||scene_==Scene::Plant)shift_=-28*m;
- if(scene_==Scene::Stretch){yaw_=m*std::sin(time_*.8f)*.38f;pitch_=m*std::sin(time_*.7f)*.16f;}
+ if(scene_==Scene::Stretch){yaw_=m*std::sin(time_)*.38f;pitch_=m*std::sin(time_)*.16f;}
  if(scene_==Scene::Wave){bob_+=m*std::sin(time_*3)*3;pitch_+=m*std::sin(time_*3)*.08f;}
  // A hovering head and its soft shadow; no torso, arms, hands or legs.
  Disc({shift_,87,50},57,5,theme_==ui::Theme::Black?0x00451B:0x006D2A,m*.65f);
  Head(m,time_);
  auto line=[&](V a,V b,float w=2,uint32_t c=0){Segment(a,b,w,c?c:ink_,m);};
  auto star=[&](float x,float y,float z,float r){for(int i=0;i<4;++i){float a=i*pi/2;line({x+std::cos(a)*r,y+std::sin(a)*r,z},{x,y,z},2);}};
- const bool props=emotion_==Emotion::Idle||(emotion_==Emotion::Printing&&scene_==Scene::Printer)||(emotion_==Emotion::Completed&&scene_==Scene::Complete)||(emotion_==Emotion::Error&&scene_==Scene::Error)||(emotion_==Emotion::Warning&&scene_==Scene::Printer)||(emotion_==Emotion::Sleepy&&scene_==Scene::Nap);
+ const bool props=!head_only_ && (emotion_==Emotion::Idle||(emotion_==Emotion::Printing&&scene_==Scene::Printer)||(emotion_==Emotion::Completed&&scene_==Scene::Complete)||(emotion_==Emotion::Error&&scene_==Scene::Error)||(emotion_==Emotion::Warning&&scene_==Scene::Printer)||(emotion_==Emotion::Sleepy&&scene_==Scene::Nap));
  if(props)switch(scene_){
  case Scene::Game:
   Box({0,58,-80},{82,26,24},ink_,m);line({-27,53,-94},{-27,65,-94},3,0x003A16);line({-33,59,-94},{-21,59,-94},3,0x003A16);
@@ -262,29 +268,29 @@ void SceneView::Build(){
  case Scene::Music:
   for(int i=0;i<16;++i){float a=pi+i*pi/16,b=pi+(i+1)*pi/16;line(Transform({94*std::cos(a),-8+73*std::sin(a),0}),Transform({94*std::cos(b),-8+73*std::sin(b),0}),6);}
   RobotBox({-94,-8,0},{14,35,30},ink_,m);RobotBox({94,-8,0},{14,35,30},ink_,m);
-  for(int j=0;j<3;++j){float x=-105+j*103,y=-58-std::fmod(time_*16+j*22,38.f);Disc({x,y,0},5,3,ink_,m);line({x+4,y,0},{x+4,y-16,0},2);line({x+4,y-16,0},{x+11,y-12,0},2);}break;
+  for(int j=0;j<3;++j){float x=-105+j*103,y=-58-std::fmod(time_*(38/(2*pi))+j*22,38.f);Disc({x,y,0},5,3,ink_,m);line({x+4,y,0},{x+4,y-16,0},2);line({x+4,y-16,0},{x+11,y-12,0},2);}break;
  case Scene::Explore:{float x=91+s*9,y=23+beat*5;for(int i=0;i<24;++i){float a=i*pi/12,b=(i+1)*pi/12;line({x+19*std::cos(a),y+19*std::sin(a),-85},{x+19*std::cos(b),y+19*std::sin(b),-85},3);}line({x-14,y+14,-85},{x-35,y+39,-85},6);star(-95,-65,0,6);break;}
  case Scene::Nap:
-  for(int j=0;j<3;++j){float x=70+j*12,y=-80-j*14-std::fmod(time_*8,12.f);line({x,y,0},{x+8,y,0});line({x+8,y,0},{x,y+9,0});line({x,y+9,0},{x+8,y+9,0});}break;
- case Scene::Fly:{float x=std::sin(time_*1.7f)*107,y=-57+std::sin(time_*3.4f)*40;Disc({x,y,-100},5,3,0xA9C8B5,m);Disc({x-3,y-5,-99},5,2+std::abs(beat)*3,0xDDFEEA,m*.6f);Disc({x+4,y-5,-99},5,3,0xDDFEEA,m*.6f);for(int i=1;i<5;++i)Disc({x-i*8,y+std::sin(time_*3-i)*6,-99},1,1,ink_,m*.3f);break;}
+  for(int j=0;j<3;++j){float x=70+j*12,y=-80-j*14-std::fmod(time_*(12/(2*pi)),12.f);line({x,y,0},{x+8,y,0});line({x+8,y,0},{x,y+9,0});line({x,y+9,0},{x+8,y+9,0});}break;
+ case Scene::Fly:{float x=std::sin(time_)*107,y=-57+std::sin(time_*2)*40;Disc({x,y,-100},5,3,0xA9C8B5,m);Disc({x-3,y-5,-99},5,2+std::abs(beat)*3,0xDDFEEA,m*.6f);Disc({x+4,y-5,-99},5,3,0xDDFEEA,m*.6f);for(int i=1;i<5;++i)Disc({x-i*8,y+std::sin(time_*3-i)*6,-99},1,1,ink_,m*.3f);break;}
  case Scene::Printer:case Scene::Complete:case Scene::Error:{
   float x=scene_==Scene::Complete?92:85;Box({x,80,-65},{62,8,42},ink_,m);Box({x-28,37,-50},{5,82,5},ink_,m);Box({x+28,37,-50},{5,82,5},ink_,m);Box({x,-3,-50},{61,6,8},ink_,m);
   float nx=x+(scene_==Scene::Error||emotion_==Emotion::Warning?0:std::sin(time_*2)*17);Box({nx,20,-60},{12,16,12},ink_,m);Box({x,66,-66},{20,emotion_==Emotion::Warning?20.f:18+8*(s+1),20},ui::kBambuGreen,m);
   if(scene_==Scene::Error){Triangle({x-15,-25,-75},{x+15,-25,-75},{x,-52,-75},0xF47668,m,false);line({x,-45,-76},{x,-35,-76},2,0x000000);Disc({x,-30,-76},1.5,1.5,0,m);}
-  if(scene_==Scene::Complete){line({-22,-83,-80},{-12,-73,-80},4);line({-12,-73,-80},{9,-94,-80},4);for(int i=0;i<16;++i){float cx=-106+(i*37%213),cy=-100+std::fmod(time_*35+i*19,185.f);Box({cx,cy,-110},{3,6,2},i%2?ink_:0xA9F48C,m);}}
+  if(scene_==Scene::Complete){line({-22,-83,-80},{-12,-73,-80},4);line({-12,-73,-80},{9,-94,-80},4);for(int i=0;i<16;++i){float cx=-106+(i*37%213),cy=-100+std::fmod(time_*(185/(2*pi))+i*19,185.f);Box({cx,cy,-110},{3,6,2},i%2?ink_:0xA9F48C,m);}}
   break;}
  case Scene::Race:
   Box({0,74,-65},{146,28,67},ink_,m);Box({0,52,-42},{80,18,40},ink_,m);for(float x:{-61.f,61.f}){Disc({x,89,-104},15,15,0x17251F,m);Disc({x,89,-105},6,6,ink_,m);line({x,89,-106},{x+10*std::sin(time_*8),89+10*std::cos(time_*8),-106},2);}
-  for(int i=0;i<5;++i){float y=30+i*18;float x=-115+std::fmod(time_*85+i*24,32.f);line({x,y,10},{x-17,y,10},1);}break;
+  for(int i=0;i<5;++i){float y=30+i*18;float x=-115+std::fmod(time_*(96/(2*pi))+i*24,32.f);line({x,y,10},{x-17,y,10},1);}break;
  case Scene::Chill:
-  for(int i=0;i<3;++i){Disc({75+i*10+std::sin(time_*.5f)*10,-93,15},13,7,ink_,m*.5f);}
+  for(int i=0;i<3;++i){Disc({75+i*10+std::sin(time_)*10,-93,15},13,7,ink_,m*.5f);}
   Disc({-95,-82,10},13,13,ink_,m*.5f);break;
  case Scene::Dance:
   for(int i=0;i<6;++i){Box({-70.f+i%3*47,107,10.f+i/3*30},{42,2,24},ink_,m*(.2f+.3f*(1+std::sin(time_*5+i))));}
   star(94,-75,0,10+beat*3);break;
  case Scene::Plant:
-  Box({83,80,-65},{29,29,28},ink_,m);line({83,66,-68},{83,24,-68},3);Disc({73,38,-70},12,5,ink_,m);Disc({94,29,-70},12,5,ink_,m);Box({38,30,-75},{24,18,22},ink_,m);line({50,28,-75},{66,42,-75},4);for(int j=0;j<3;++j)Disc({64.f+j*3,42+std::fmod(time_*30+j*8,28.f),-77},1.5,3,ink_,m);break;
- case Scene::PaperPlane:{float x=std::sin(time_*1.3f)*105,y=-63+std::cos(time_*1.3f)*18;Triangle({x-15,y+9,-95},{x+22,y,-95},{x-8,y-9,-85},ink_,m);Triangle({x-8,y-9,-85},{x+22,y,-95},{x-2,y+3,-105},Shade(ink_,.6f),m);break;}
+  Box({83,80,-65},{29,29,28},ink_,m);line({83,66,-68},{83,24,-68},3);Disc({73,38,-70},12,5,ink_,m);Disc({94,29,-70},12,5,ink_,m);Box({38,30,-75},{24,18,22},ink_,m);line({50,28,-75},{66,42,-75},4);for(int j=0;j<3;++j)Disc({64.f+j*3,42+std::fmod(time_*(28/(2*pi))+j*8,28.f),-77},1.5,3,ink_,m);break;
+ case Scene::PaperPlane:{float x=std::sin(time_)*105,y=-63+std::cos(time_)*18;Triangle({x-15,y+9,-95},{x+22,y,-95},{x-8,y-9,-85},ink_,m);Triangle({x-8,y-9,-85},{x+22,y,-95},{x-2,y+3,-105},Shade(ink_,.6f),m);break;}
  case Scene::Magic:
   line({52,46,-70},{82,-10,-70},4);star(83,-14,-72,9);Box({94,-58+beat*7,-40},{23,23,23},ink_,m);star(-92,-63,-40,6);break;
  case Scene::Stretch:star(-97,-72,0,5);star(97,-72,0,5);break;

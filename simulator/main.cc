@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -180,9 +181,9 @@ public:
         Box(logo,15,17,3,6,0xFFFFFF,1); Box(logo,23,17,3,6,0xFFFFFF,1);
         Label(root_,87,26,"Bambu Bot",&lv_font_montserrat_28,0xEFF6EE);
         Label(root_,88,60,"A little companion for every print.",&lv_font_montserrat_12,0x819D8C);
-        auto tag=Box(root_,917,37,211,30,0x13241B,15);
+        auto tag=Box(root_,1038,37,90,30,0x13241B,15);
         Box(tag,13,11,7,7,kBambuGreen,4);
-        Label(tag,29,8,"EMOTION STUDIO  /  " BAMBU_STUDIO_VERSION,&lv_font_montserrat_12,0xB8D2BE);
+        Label(tag,28,8,"v" BAMBU_STUDIO_VERSION,&lv_font_montserrat_12,0xB8D2BE);
 
         auto left=Box(root_,32,108,640,585,0x101D16,22); Border(left,0x22362A);
         Label(left,24,22,"DEVICE PREVIEW",&lv_font_montserrat_12,0x88A18D);
@@ -196,6 +197,8 @@ public:
         lv_obj_add_event_cb(green_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->SetTheme(Theme::Green);},LV_EVENT_CLICKED,this);
         mode_button_=Button(root_,800,37,104,32,"3D scenes");
         lv_obj_add_event_cb(mode_button_,[](lv_event_t* e){auto self=static_cast<Studio*>(lv_event_get_user_data(e));self->Set3D(!self->mode3d_);},LV_EVENT_CLICKED,this);
+        heads_button_=Button(root_,917,37,110,32,"3D heads");
+        lv_obj_add_event_cb(heads_button_,[](lv_event_t* e){auto self=static_cast<Studio*>(lv_event_get_user_data(e));self->Set3D(!self->head_mode_,!self->head_mode_);},LV_EVENT_CLICKED,this);
         preview_panel_=left;
         caption_=Label(left,0,550,"",&lv_font_montserrat_12,0x8CA391);
 
@@ -237,7 +240,7 @@ public:
         lv_obj_add_event_cb(motion_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->ToggleMotion();},LV_EVENT_CLICKED,this);
         Label(right,24,548,"DEMO data / No printer connection.",&lv_font_montserrat_12,0x728D7B);
         description_=Label(root_,48,710,"",&lv_font_montserrat_12,0x8CA391);
-        Label(root_,680,710,"D 2D/3D / B Replay / SPACE Play / R / T / M",&lv_font_montserrat_12,0x728D7B);
+        Label(root_,680,710,"D scenes / E heads / B Replay / SPACE / R / T / M",&lv_font_montserrat_12,0x728D7B);
         SetRound(true);
         Select(0);
     }
@@ -258,6 +261,7 @@ public:
         scene_=std::make_unique<SceneView>(bezel_,w,h,round);
         lv_obj_set_pos(scene_->root(),9,9);
         scene_->SetScene(static_cast<Scene>(selected_scene_));
+        scene_->SetHeadOnly(head_mode_);scene_->SetEmotion(head_mode_?static_cast<Emotion>(selected_):Emotion::Idle);
         face_->SetAnimated(motion_ && !mode3d_);
         scene_->SetAnimated(motion_ && mode3d_);
         scene_->RenderAt(scene_time);
@@ -274,24 +278,28 @@ public:
         Border(black_button_,theme==Theme::Black?kBambuGreen:0x2A3A31);
         Border(green_button_,theme==Theme::Green?kBambuGreen:0x2A3A31);
     }
-    void Set3D(bool enabled) {
-        mode3d_=enabled;
-        for (auto button:buttons_) {if(enabled)lv_obj_add_flag(button,LV_OBJ_FLAG_HIDDEN);else lv_obj_remove_flag(button,LV_OBJ_FLAG_HIDDEN);}
-        for (auto button:scene_buttons_) {if(enabled)lv_obj_remove_flag(button,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(button,LV_OBJ_FLAG_HIDDEN);}
+    void Set3D(bool enabled,bool heads=false) {
+        mode3d_=enabled;head_mode_=enabled&&heads;
+        scene_->SetHeadOnly(head_mode_);scene_->SetEmotion(head_mode_?static_cast<Emotion>(selected_):Emotion::Idle);
+        Border(heads_button_,head_mode_?kBambuGreen:0x2A3A31);
+        for (auto button:buttons_) {if(enabled&&!head_mode_)lv_obj_add_flag(button,LV_OBJ_FLAG_HIDDEN);else lv_obj_remove_flag(button,LV_OBJ_FLAG_HIDDEN);}
+        for (auto button:scene_buttons_) {if(enabled&&!head_mode_)lv_obj_remove_flag(button,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(button,LV_OBJ_FLAG_HIDDEN);}
         lv_obj_add_flag(enabled?face_->root():scene_->root(),LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(enabled?scene_->root():face_->root(),LV_OBJ_FLAG_HIDDEN);
         face_->SetAnimated(motion_ && !enabled);scene_->SetAnimated(motion_ && enabled);
-        lv_label_set_text(heading_,enabled?"Little 3D adventures":"Meet the moods");
-        lv_label_set_text(hint_,enabled?"Pick a story. Watch Bam come to life.":"Pick a feeling. Watch the little details.");
+        lv_label_set_text(heading_,head_mode_?"Expressive 3D heads":enabled?"Little 3D adventures":"Meet the moods");
+        lv_label_set_text(hint_,head_mode_?"Pick a feeling. Watch Bam react.":enabled?"Pick a story. Watch Bam come to life.":"Pick a feeling. Watch the little details.");
         SetButtonText(mode_button_,enabled?"2D moods":"3D scenes");
-        if(enabled)SelectScene(selected_scene_);else Select(selected_);
+        if(enabled&&!head_mode_)SelectScene(selected_scene_);else Select(selected_);
+        // Repaint the whole editor when overlapping control sets change visibility.
+        lv_obj_invalidate(root_);
     }
     void SelectScene(int index) {
         selected_scene_=(index+kScenes)%kScenes;scene_->SetScene(static_cast<Scene>(selected_scene_));
         for(int i=0;i<kScenes;++i)Border(scene_buttons_[i],i==selected_scene_?kBambuGreen:0x2A3A31);
         lv_label_set_text(description_,DescribeScene(static_cast<Scene>(selected_scene_)).description);last_cycle_=ticks;
     }
-    void Next(int step) {if(mode3d_)SelectScene(selected_scene_+step);else Select(selected_+step);}
+    void Next(int step) {if(mode3d_&&!head_mode_)SelectScene(selected_scene_+step);else Select(selected_+step);}
     void Replay() {if(mode3d_)scene_->Restart();}
     void Toggle3D() {Set3D(!mode3d_);}
     void ToggleTheme() { SetTheme(theme_==Theme::Black?Theme::Green:Theme::Black); }
@@ -302,6 +310,7 @@ public:
         if (emotion==Emotion::Completed) progress_=100;
         else if (previous==static_cast<int>(Emotion::Completed)) progress_=42;
         face_->SetEmotion(emotion);
+        if(head_mode_)scene_->SetEmotion(emotion);
         for (int i=0;i<kCount;++i) {
             bool active=i==selected_;
             lv_obj_set_style_bg_color(buttons_[i],lv_color_hex(active?0x263E2D:0x17251F),0);
@@ -326,6 +335,8 @@ public:
     void ToggleMotion() { motion_=!motion_;face_->SetAnimated(motion_ && !mode3d_);scene_->SetAnimated(motion_ && mode3d_);SetButtonText(motion_button_,motion_?"Motion on":"Motion off"); }
     void Tick() { if (auto_ && ticks-last_cycle_>=(mode3d_?9000u:3500u)) Next(1); }
     SceneView& scene() {return *scene_;}
+    lv_obj_t* heads_button() {return heads_button_;}
+    bool head_mode() const {return head_mode_;}
     lv_obj_t* mode_button() {return mode_button_;}
     lv_obj_t* scene_button(int i) {return scene_buttons_[i];}
     bool mode3d() const {return mode3d_;}
@@ -360,6 +371,8 @@ private:
     std::array<Action,kCount> actions_{};
     std::unique_ptr<FaceView> face_;
     int selected_=0,progress_=42;
+    lv_obj_t* heads_button_=nullptr;
+    bool head_mode_=false;
     bool round_=true,motion_=true,auto_=false;
     uint32_t last_cycle_=0;
 };
@@ -396,7 +409,20 @@ void FastClick(Canvas& canvas,lv_obj_t* button) {
     DrainPointerEvents(canvas);
     canvas.Frame(ticks+50);
 }
+std::vector<uint8_t> animation_bank_storage;
+void LoadAnimationBank() {
+    const char* base=SDL_GetBasePath();
+    fs::path resource=base?fs::path(base)/"../Resources/animations.bba":fs::path();
+    SDL_free(const_cast<char*>(base));
+    if(!fs::exists(resource))resource=BAMBU_BANK_PATH;
+    std::ifstream file(resource,std::ios::binary);
+    if(file)animation_bank_storage.assign(std::istreambuf_iterator<char>(file),{});
+    if(!bambu::ui::AnimationBank::SetData(animation_bank_storage.data(),animation_bank_storage.size()))
+        std::cerr<<"Animation bank unavailable; using CPU mesh fallback\n";
+}
+
 void SelfTest(Canvas& canvas) {
+    Require(bambu::ui::AnimationBank::Size()>0,"Full animation bank missing");
     Studio studio;
     canvas.Frame(ticks+100);
     FastClick(canvas,studio.button(static_cast<int>(Emotion::Happy)));
@@ -507,7 +533,7 @@ void SelfTest(Canvas& canvas) {
             for(uint32_t time:{0u,600u,1200u,2500u,5000u,9000u,17000u}) {
                 studio.scene().RenderAt(time);canvas.Frame(ticks+33);
                 Require(!studio.scene().overflowed(),"3D primitive pool exhausted");
-                Require(studio.scene().primitive_count()>50,"3D mesh missing");
+                Require(studio.scene().playback_active()||studio.scene().primitive_count()>50,"3D image missing");
                 Require(lv_obj_get_child_count(studio.scene().root())==nodes,"Scene created transient LVGL objects");
             }
             studio.Replay();Require(studio.scene().elapsed()==0,"2D to 3D replay failed");
@@ -569,7 +595,7 @@ void SelfTest(Canvas& canvas) {
         const auto objects=ObjectCount(view.root());
         for(auto theme:{Theme::Black,Theme::Green}){view.SetTheme(theme);
             for(int i=0;i<300;++i){view.RenderAt(i*50);canvas.Frame(ticks+50);Require(view.coffee_playback_active(),"Coffee did not use clip");}}
-        Require(view.coffee_buffer_bytes()==86172,"Coffee RAM budget changed");
+        Require(view.playback_buffer_bytes()==bambu::ui::AnimationBank::MaxPixels()*4,"Clip RAM budget changed");
         Require(ObjectCount(view.root())==objects,"Coffee allocated widgets per frame");
         view.RenderAt(1500);const auto frame=view.coffee_frame();Telemetry live;live.demo=false;live.connected=true;live.progress=73;live.nozzle_c=215;live.bed_c=65;view.SetTelemetry(live);
         Require(view.coffee_frame()==frame && AllText(view.root()).find("73%")!=std::string::npos,"Coffee HUD not live");
@@ -605,7 +631,7 @@ void SelfTest(Canvas& canvas) {
             view.SetEmotion(emotion);Require(!view.printer_playback_active(),"Printer clip masks priority state");}
         view.SetEmotion(Emotion::Idle);
         for(int i=0;i<20;++i){view.SetScene(i%2?Scene::Printer:Scene::Coffee);view.RenderAt(2500);canvas.Frame(ticks+50);}
-        Require(view.playback_buffer_bytes()==112000,"Shared clip buffers grew while switching scenes");
+        Require(view.playback_buffer_bytes()==bambu::ui::AnimationBank::MaxPixels()*4,"Shared clip buffers grew while switching scenes");
         Require(ObjectCount(view.root())==objects,"Printer clip allocated transient widgets");
         view.SetScene(Scene::Printer);view.SetAnimated(true);canvas.Frame(ticks+50);view.SetAnimated(false);const auto elapsed=view.elapsed();canvas.Frame(ticks+1000);
         Require(view.elapsed()==elapsed,"Printer clip pause failed");view.Restart();Require(view.playback_frame()==0,"Printer intro replay failed");
@@ -613,6 +639,59 @@ void SelfTest(Canvas& canvas) {
         SceneView round(lv_screen_active(),466,466,true);round.SetAnimated(false);round.SetScene(Scene::Printer);
         Require(!round.printer_playback_active(),"Printer clip used on round display");
     }
+    {
+        using Bank=bambu::ui::AnimationBank;
+        std::vector<uint16_t> output(Bank::MaxPixels());size_t decoded=0;
+        for(uint32_t id=0;id<Bank::kClipCount;++id)for(bool green:{false,true}){
+            Bank::Clip clip;Require(Bank::Get(id,green,clip),"Missing animation entry");
+            Require(Bank::FrameAt(clip,1200)==24,"Bank intro boundary");
+            Require(Bank::FrameAt(clip,clip.frames*50)==24,"Bank loop boundary");
+            for(uint32_t frame=0;frame<clip.frames;++frame){Require(Bank::Decode(clip,frame,output.data(),clip.width*clip.height),"Bank frame cannot decode");++decoded;}
+            Require(!Bank::Decode(clip,clip.frames,output.data(),clip.width*clip.height),"Bank accepted out-of-range frame");
+            Require(!Bank::Decode(clip,0,output.data(),clip.width*clip.height-1),"Bank accepted wrong output size");
+        }
+        Require(decoded==5756,"Animation bank coverage changed");
+        SceneView view(lv_screen_active(),280,240,false,2,100);view.SetAnimated(false);
+        const auto objects=ObjectCount(view.root());
+        for(int pass=0;pass<3;++pass)for(int id=0;id<32;++id){
+            view.SetTheme(pass%2?Theme::Green:Theme::Black);view.SetHeadOnly(id>=18);
+            view.SetScene(id<18?static_cast<Scene>(id):Scene::Game);view.SetEmotion(id<18?Emotion::Idle:static_cast<Emotion>(id-18));
+            view.RenderAt(2500);canvas.Frame(ticks+50);
+            Require(view.playback_active() && view.playback_id()==id,"Wrong animation/emotion selected");
+            Require(ObjectCount(view.root())==objects,"Bank allocates transient widgets");
+        }
+        Require(view.playback_buffer_bytes()==Bank::MaxPixels()*4,"Bank buffers grew across 32 clips");
+        // AI expressions must show clean heads unless printer scene evidence is present.
+        view.SetHeadOnly(false);view.SetScene(Scene::Game);view.SetEmotion(Emotion::Error);Require(view.playback_id()==30,"AI error became printer alert");
+        view.SetScene(Scene::Error);Require(view.playback_id()==11,"Real error lost printer alert");
+        view.SetScene(Scene::Game);view.SetEmotion(Emotion::Completed);Require(view.playback_id()==24,"AI happy became print completion");
+        view.SetScene(Scene::Complete);Require(view.playback_id()==7,"Real completion lost celebration");
+        view.SetScene(Scene::Printer);view.SetEmotion(Emotion::Warning);Require(view.playback_id()==29,"Paused printer is moving");
+        // Bad or replaced assets must return to mesh, then recover without dangling pointers.
+        auto corrupt=animation_bank_storage;
+        Require(!Bank::SetData(corrupt.data(),16),"Truncated bank header accepted");
+        view.RenderAt(2500);Require(!view.playback_active(),"Missing bank has no fallback");
+        corrupt[0]^=1;Require(!Bank::SetData(corrupt.data(),corrupt.size()),"Bad bank magic accepted");corrupt[0]^=1;
+        const auto read=[&](size_t i){return uint32_t(corrupt[i])|uint32_t(corrupt[i+1])<<8|uint32_t(corrupt[i+2])<<16|uint32_t(corrupt[i+3])<<24;};
+        const auto table=read(32+36),chunk=read(table);corrupt[chunk]=0;
+        Require(Bank::SetData(corrupt.data(),corrupt.size()),"Compression corruption test bank rejected early");
+        view.SetEmotion(Emotion::Idle);view.SetScene(Scene::Game);view.SetTheme(Theme::Black);view.Restart();Require(!view.playback_active(),"Corrupt compressed frame has no fallback");
+        corrupt=animation_bank_storage;corrupt[32+16]=255;corrupt[32+17]=255;
+        Require(!Bank::SetData(corrupt.data(),corrupt.size()),"Oversized bank dimensions accepted");
+        Require(Bank::SetData(animation_bank_storage.data(),animation_bank_storage.size()),"Bank reload failed");
+        view.RenderAt(2500);Require(view.playback_active(),"Bank reload did not recover");
+        studio.SetRound(false);studio.Set3D(false);FastClick(canvas,studio.heads_button());Require(studio.head_mode(),"3D heads button failed");
+        for(int i=0;i<kCount;++i){
+            lv_area_t area;lv_obj_get_coords(studio.button(i),&area);
+            const auto fill=canvas.pixels[(area.y1+8)*kWidth+area.x1+8]&0xFFFFFF;
+            Require(fill==0x17251F||fill==0x263E2D,"Head control was clickable but not painted");
+            FastClick(canvas,studio.button(i));Require(studio.scene().playback_id()==18+i,"Head button selected wrong emotion");
+        }
+        studio.SetRound(true);Require(!studio.scene().playback_active(),"280x240 bank used on round display");
+        studio.SetRound(false);Require(studio.scene().playback_id()==31,"Display change lost head expression");
+        FastClick(canvas,studio.heads_button());Require(!studio.mode3d(),"Exit 3D heads failed");
+    }
+    std::cout<<"PASS: all 5756 frames, 18 scenes + 14 heads, both themes, bounded RAM/widgets, malformed/replaced assets and mesh recovery, fast clicks on 14 head emotions\n";
     std::cout<<"PASS: 176 Printer check frames, loop timing, bounded shared clip buffers, switching, telemetry, interruption and pause/replay\n";
     std::cout<<"PASS: all 300 coffee frames, decoder bounds, seamless timing, native RGB565 playback, bounded RAM/widgets, independent live/stale HUD and priority/pause/replay\n";
     std::cout<<"PASS: firmware 140x120 raster, scaling, real/demo labels, scene priorities and conversation emotions; 18 3D scenes, replay, 2 themes, 2 displays, bounded mesh pools; fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, both themes on both displays, compact layout without DEMO, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
@@ -626,6 +705,49 @@ void ExportCoffeePreview(Canvas& canvas,const fs::path& output,bool printer=fals
         const auto path=output/(theme==Theme::Black?"black":"green");fs::create_directories(path);view.SetTheme(theme);
         for(int i=0;i<(printer?88:150);++i){view.RenderAt(i*50);canvas.Frame(ticks+50);
             char name[32];std::snprintf(name,sizeof(name),"frame-%03d.bmp",i);canvas.SaveLcd(view.root(),path/name);}
+    }
+}
+
+// Full-quality, geometry-only RGB565 capture, one raw stream per clip/theme.
+void ExportAnimationPreviews(Canvas& canvas,const fs::path& output) {
+    fs::create_directories(output);
+    SceneView view(lv_screen_active(),280,240,false,2,100);view.SetAnimated(false);
+    Telemetry demo;demo.progress=42;demo.nozzle_c=220;demo.bed_c=60;view.SetTelemetry(demo);
+    for(int id=0;id<32;++id)for(auto theme:{Theme::Black,Theme::Green}){
+        view.SetTheme(theme);view.SetHeadOnly(id>=18);view.SetScene(id<18?static_cast<Scene>(id):Scene::Game);
+        view.SetEmotion(id<18?Emotion::Idle:static_cast<Emotion>(id-18));demo.connected=id!=31;view.SetTelemetry(demo);view.RenderAt(3200);canvas.Frame(ticks+50);
+        char name[80];std::snprintf(name,sizeof(name),"%s-%02d-%s.bmp",id<18?"scene":"head",id<18?id:id-18,theme==Theme::Black?"black":"green");
+        canvas.SaveLcd(view.root(),output/name);
+        if(id==0||id==2||id==5||id==8||id==12||id==15||id==19||id==20||id==21||id==23||id==27||id==30){
+            const auto path=output/("clip-"+std::to_string(id)+(theme==Theme::Black?"-black":"-green"));fs::create_directories(path);
+            for(int frame=0;frame<88;++frame){view.RenderAt(frame*50);canvas.Frame(ticks+50);
+                std::snprintf(name,sizeof(name),"frame-%03d.bmp",frame);canvas.SaveLcd(view.root(),path/name);}
+        }
+    }
+}
+
+void ExportAnimationSources(const fs::path& output) {
+    fs::create_directories(output);
+    for(int id=0;id<kScenes+kCount;++id) {
+        SceneView source(lv_screen_active(),280,240,false);source.SetAnimated(false);source.EnableAllPlayback(false);
+        source.SetHeadOnly(id>=kScenes);source.SetScene(id<kScenes?static_cast<Scene>(id):Scene::Game);
+        source.SetEmotion(id<kScenes?Emotion::Idle:static_cast<Emotion>(id-kScenes));
+        const int loop=id==static_cast<int>(Scene::Coffee)?126:64;
+        for(auto theme:{Theme::Black,Theme::Green}) {
+            source.SetTheme(theme);
+            char name[48];std::snprintf(name,sizeof(name),"clip-%02d-%s.rgb565",id,theme==Theme::Black?"black":"green");
+            std::ofstream file(output/name,std::ios::binary);if(!file)throw std::runtime_error("Cannot write geometry stream");
+            std::vector<uint8_t> bytes(280*240*2);
+            for(int i=0;i<24+loop;++i){
+                const auto elapsed=i<24?i*50:1200+static_cast<uint32_t>((i-24)*6283.185307/loop);
+                source.RenderAt(elapsed);const auto& pixels=source.RasterFrame();
+                for(size_t j=0;j<pixels.size();++j){const auto c=pixels[j];const uint16_t color=((c>>19)&31)<<11|((c>>10)&63)<<5|((c>>3)&31);
+                    bytes[j*2]=color&255;bytes[j*2+1]=color>>8;}
+                file.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());
+            }
+            if(!file)throw std::runtime_error("Failed writing geometry stream");
+        }
+        std::cout<<"Captured clip "<<id+1<<"/"<<kScenes+kCount<<'\n';
     }
 }
 
@@ -722,31 +844,39 @@ void Export(Canvas& canvas,const fs::path& output) {
 }  // namespace
 
 int main(int argc,char** argv) {
-    bool headless=false,self_test=false,coffee_demo=false,printer_demo=false;
-    fs::path output,coffee_output,coffee_preview,printer_output,printer_preview;
+    bool headless=false,self_test=false,coffee_demo=false,printer_demo=false,all_demo=false,heads_demo=false;
+    fs::path output,coffee_output,coffee_preview,printer_output,printer_preview,animation_sources,animation_previews;
     for (int i=1;i<argc;++i) {
         if (!std::strcmp(argv[i],"--self-test")) {headless=true;self_test=true;}
+        else if (!std::strcmp(argv[i],"--all-demo")) all_demo=true;
+        else if (!std::strcmp(argv[i],"--heads-demo")) heads_demo=true;
+        else if (!std::strcmp(argv[i],"--animations-preview") && i+1<argc) {headless=true;animation_previews=argv[++i];}
         else if (!std::strcmp(argv[i],"--printer-demo")) printer_demo=true;
         else if (!std::strcmp(argv[i],"--printer-preview") && i+1<argc) {headless=true;printer_preview=argv[++i];}
         else if (!std::strcmp(argv[i],"--coffee-demo")) coffee_demo=true;
         else if (!std::strcmp(argv[i],"--coffee-preview") && i+1<argc) {headless=true;coffee_preview=argv[++i];}
         else if (!std::strcmp(argv[i],"--headless")) headless=true;
+        else if (!std::strcmp(argv[i],"--export-animations") && i+1<argc) {headless=true;animation_sources=argv[++i];}
         else if (!std::strcmp(argv[i],"--export-printer") && i+1<argc) {headless=true;printer_output=argv[++i];}
         else if (!std::strcmp(argv[i],"--export-coffee") && i+1<argc) {headless=true;coffee_output=argv[++i];}
         else if (!std::strcmp(argv[i],"--output") && i+1<argc) output=argv[++i];
         else {std::cerr<<"Usage: bambu_studio [--coffee-demo | --printer-demo] [--self-test] [--headless --output DIRECTORY] [--export-coffee DIRECTORY | --export-printer DIRECTORY] [--coffee-preview DIRECTORY | --printer-preview DIRECTORY]\n";return 2;}
     }
-    if (headless && !self_test && output.empty() && coffee_output.empty() && coffee_preview.empty() && printer_output.empty() && printer_preview.empty()) {std::cerr<<"Headless mode requires --self-test or --output\n";return 2;}
+    if (headless && !self_test && output.empty() && coffee_output.empty() && coffee_preview.empty() && printer_output.empty() && printer_preview.empty() && animation_sources.empty() && animation_previews.empty()) {std::cerr<<"Headless mode requires --self-test or --output\n";return 2;}
     try {
         Canvas canvas(headless);
+        LoadAnimationBank();
         if (self_test) SelfTest(canvas);
         if (!output.empty()) Export(canvas,output);
+        if (!animation_previews.empty()) ExportAnimationPreviews(canvas,animation_previews);
+        if (!animation_sources.empty()) ExportAnimationSources(animation_sources);
         if (!coffee_output.empty()) ExportCoffee(coffee_output);
         if (!printer_output.empty()) ExportCoffee(printer_output,true);
         if (!coffee_preview.empty()) ExportCoffeePreview(canvas,coffee_preview);
         if (!printer_preview.empty()) ExportCoffeePreview(canvas,printer_preview,true);
         if (headless) return 0;
         Studio studio;
+        if(all_demo||heads_demo){studio.SetRound(false);studio.Set3D(true,heads_demo);studio.ToggleAuto();}
         if(printer_demo){studio.SetRound(false);studio.Set3D(true);studio.SelectScene(static_cast<int>(Scene::Printer));}
         if(coffee_demo){studio.SetRound(false);studio.Set3D(true);studio.SelectScene(static_cast<int>(Scene::Coffee));}
         bool running=true;
@@ -763,6 +893,7 @@ int main(int argc,char** argv) {
                         case SDLK_LEFT:studio.Next(-1);break;
                         case SDLK_d:studio.Toggle3D();break;
                         case SDLK_b:studio.Replay();break;
+                        case SDLK_e:studio.Set3D(!studio.head_mode(),!studio.head_mode());break;
                         case SDLK_SPACE:studio.ToggleAuto();break;
                         case SDLK_t:studio.ToggleTheme();break;
                         case SDLK_r:studio.SetRound(!studio.round());break;

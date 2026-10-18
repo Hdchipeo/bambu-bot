@@ -13,9 +13,9 @@ brew install cmake ninja sdl2
 
 ![Bambu Bot emotions](docs/ui/emotion-sheet.png)
 
-Studio **0.3.3** bổ sung [18 kịch bản 3D](docs/3D_SCENES.md) chỉ phần đầu robot, với chuyển 2D → 3D, đạo cụ động và hai theme. Mở bằng nút **3D scenes** hoặc phím **D**; đây là bản thử nghiệm simulator.
+Studio **0.4.0** có đủ **18 kịch bản 3D và 14 biểu cảm phần đầu**, hai theme, phát frame dựng sẵn trên 280×240 với nhịp mục tiêu 20 FPS. Chọn **3D scenes / D** hoặc **3D heads / E**. Xem [toàn bộ preview và kiến trúc animation](docs/ANIMATION_BANK.md).
 
-Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; đã tích hợp giao diện **3D chỉ phần đầu** vào firmware **v0.3.0** cho Desk-bot 280×240.
+Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; firmware **v0.4.0** cho Desk-bot 280×240 dùng bank animation trong phân vùng assets, giữ renderer CPU làm dự phòng.
 
 ## Bản thử nghiệm hiện tại
 
@@ -33,11 +33,11 @@ Từ Desk-bot chỉ nhập nguyên file định nghĩa phần cứng vào [`main
 | Popup và âm báo khi hoàn tất hoặc có `print_error` mới | Chưa có giọng nói thông báo chủ động, giải mã HMS hay RAG Wiki |
 | Không tự nạp bản firmware XiaoZhi do server discovery đề nghị | OTA discovery vẫn dùng để lấy cấu hình hội thoại/kích hoạt |
 
-Firmware v0.3.0 dùng chung `ui/scene3d.*` và `ui/printer_icon.h` với simulator. Có 15 cảnh vui luân phiên mỗi 12 giây khi idle; dữ liệu máy in ưu tiên cảnh Printing / Completed / Error. Lỗi/kết thúc do dữ liệu máy in xác nhận, không do biểu cảm AI hoặc vòng idle tự tạo. Khi nghe/nói, đầu robot đổi biểu cảm và tạm ẩn đạo cụ idle.
+Firmware v0.4.0 dùng chung `ui/scene3d.*` và `ui/printer_icon.h` với simulator. Có 15 cảnh vui luân phiên mỗi 12 giây khi idle; dữ liệu máy in ưu tiên cảnh Printing / Completed / Error. Lỗi/kết thúc do dữ liệu máy in xác nhận, không do biểu cảm AI hoặc vòng idle tự tạo. Khi nghe/nói, đầu robot đổi biểu cảm và tạm ẩn đạo cụ idle.
 
-Để giảm RAM/CPU, firmware render 3D **140×120**, phóng lên **280×240**; chữ, icon và thanh tiến độ vẫn vẽ ở 280×240. Hai buffer màu/depth dùng **134.400 byte**, cộng pool hình học và LVGL. Timer đặt 100 ms/frame, chưa phải FPS đã đo trên thiết bị. Giữ nguyên driver/pin LCD và BOOT.
+Trên LCD 280×240, frame RGB565 được giải nén từ bank **5,28 MiB** trong phân vùng assets 8 MiB. Hai bộ đệm dùng chung **136.160 byte**; icon/chữ/tiến độ vẫn vẽ bằng LVGL. App còn **31%** phân vùng sau build, không đổi bảng phân vùng hoặc pinout. Nhịp 50 ms/frame là mục tiêu **20 FPS**, chưa được đo trên thiết bị; thiếu/hỏng bank thì dùng renderer CPU 140×120 như trước.
 
-![Firmware 3D profile](docs/ui/firmware-3d-green.png)
+![Bộ animation](docs/ui/all-scenes-gallery.gif)
 
 **Servo chưa bật:** `config.h` nguồn không định nghĩa chân servo. Không tự gán chân hoặc bật GPIO đèn mẫu của upstream.
 

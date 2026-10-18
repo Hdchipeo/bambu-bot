@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import zipfile
+from verify_animation_assets import verify_assets
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,10 +31,12 @@ def main():
         "bambu_bot.bin": "bambu_bot.bin",
         "generated_assets.bin": "generated_assets.bin",
     }
-    manifest = {"project": "bambu-bot", "version": version, "profile": "deskbot-demo",
+    animation_bank = verify_assets(build / "generated_assets.bin")
+    manifest = {"animation_bank": animation_bank,"project": "bambu-bot", "version": version, "profile": "deskbot-demo",
                 "forced_demo": forced_demo,
                 "coffee_preview": "BAMBU_COFFEE_PREVIEW:BOOL=ON" in cache,
                 "printer_preview": "BAMBU_PRINTER_PREVIEW:BOOL=ON" in cache,
+                "animation_preview": "BAMBU_ANIMATION_PREVIEW:BOOL=ON" in cache,
                 "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "sha256": {name: hashlib.sha256((build / src).read_bytes()).hexdigest()
                            for name, src in sources.items()}}
@@ -43,11 +46,13 @@ ESP32-S3, flash 16 MB, octal PSRAM, ST7789 and I2S pinout from config.h.
 This is simulated printer data. Servo outputs are disabled.
 UI: short BOOT toggles chat; hold BOOT toggles black/green vs green/white theme.
 Theme is saved to NVS. The compact LCD intentionally hides the DEMO label.
-Head-only 3D UI renders at 140x120, scaled to 280x240; telemetry icons/text are native resolution.
-Coffee and Printer check use cropped native RGB565 frames, 50 ms target (20 FPS).
-Other 3D scenes retain the 100 ms CPU renderer. When enabled, an animation preview profile
-overrides idle/printing visuals; conversation and printer alerts take priority.
-Actual LCD FPS and audio/MQTT performance of this experimental clip are unverified.
+All 18 3D scenes and 14 head emotions use native RGB565/zlib animation clips on 280x240.
+The 5.28 MiB animation bank is in the existing assets partition, separate from app code.
+Telemetry icons/text remain independent native LVGL objects. Animation target: 50 ms (20 FPS).
+The full demo-preview profile cycles scenes and heads; its printer telemetry is simulated.
+Normal firmware retains automatic selection and prioritizes conversations and printer alerts.
+Missing/corrupt animation assets fall back to the CPU mesh renderer.
+Actual LCD FPS and simultaneous audio/MQTT performance of this version are unverified.
 
 Install esptool 4.x in your Python environment or activate ESP-IDF 5.5.4.
 Unzip all files in one directory. Replace PORT with the USB-UART device path:

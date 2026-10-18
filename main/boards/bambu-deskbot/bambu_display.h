@@ -19,13 +19,14 @@ public:
     void SetPowerSaveMode(bool on) override;
     void UpdatePrinter(const bambu::Snapshot& snapshot);
     void ToggleBambuTheme();
+    void ReloadAnimationBank(bool available);
 private:
     void Refresh();
     void ApplyColors();
     std::unique_ptr<bambu::ui::SceneView> scene_;
     bambu::ui::Scene active_scene_ = bambu::ui::Scene::Count;
     bambu::ui::Emotion active_emotion_ = bambu::ui::Emotion::Offline;
-    uint32_t idle_started_ = 0;
+    uint32_t idle_started_ = 0, animation_preview_started_ = 0;
     lv_timer_t* refresh_timer_ = nullptr;
     lv_obj_t* message_panel_ = nullptr;
     lv_obj_t* message_label_ = nullptr;

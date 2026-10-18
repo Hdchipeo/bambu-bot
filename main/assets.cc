@@ -1,4 +1,7 @@
 #include "assets.h"
+#if CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD
+#include "boards/bambu-deskbot/bambu_display.h"
+#endif
 #include "board.h"
 #include "display.h"
 #include "application.h"
@@ -428,6 +431,11 @@ bool Assets::EmoteStrategy::Apply(Assets* assets, bool refresh_display_theme) {
 bool Assets::Download(std::string url, std::function<void(int progress, size_t speed)> progress_callback) {
     ESP_LOGI(TAG, "Downloading new version of assets from %s", url.c_str());
 
+#if CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD
+    // Stop bank reads under the display lock before unmapping/replacing assets.
+    auto* bambu_display = dynamic_cast<BambuDisplay*>(Board::GetInstance().GetDisplay());
+    if (bambu_display) bambu_display->ReloadAnimationBank(false);
+#endif
     // 取消当前资源分区的内存映射
     UnApplyPartition();
 
@@ -557,6 +565,8 @@ bool Assets::Download(std::string url, std::function<void(int progress, size_t s
         ESP_LOGE(TAG, "Failed to re-initialize assets partition");
         return false;
     }
-
+#if CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD
+    if (bambu_display) bambu_display->ReloadAnimationBank(true);
+#endif
     return true;
 }
