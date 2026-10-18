@@ -2,6 +2,19 @@
 
 Robot chatbot để bàn theo dõi Bambu Lab A1, phát triển trên [XiaoZhi](https://github.com/78/xiaozhi-esp32).
 
+## Giao diện và emotion trên macOS
+
+Đã có **Bambu Bot Emotion Studio** dùng LVGL 9.5.0 + SDL2: 14 emotion có animation, hai kích thước LCD 280×240 / màn tròn 466×466, thanh tiến độ và chế độ chạy tự động.
+
+```sh
+brew install cmake ninja sdl2
+./scripts/run_simulator.sh
+```
+
+![Bambu Bot emotions](docs/ui/emotion-sheet.png)
+
+Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; hiện là bản giả lập để duyệt thiết kế, chưa thay giao diện firmware bên dưới.
+
 ## Bản thử nghiệm hiện tại
 
 Dùng phần cứng Desk-bot có sẵn: **ESP32-S3, màn ST7789 240×280, mic I2S và loa I2S**. Đây là cấu hình test trước khi chuyển sang Waveshare AMOLED 1.75.

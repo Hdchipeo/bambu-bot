@@ -24,3 +24,4 @@ main/bambu/local_config.h
 bambu.local.json
 *.pem
 *.key
+simulator/build/

@@ -1,0 +1,15 @@
+name: LVGL studio
+on:
+  push:
+    paths: ['ui/**', 'simulator/**', '.github/workflows/simulator.yml']
+  pull_request:
+    paths: ['ui/**', 'simulator/**', '.github/workflows/simulator.yml']
+jobs:
+  headless:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libsdl2-dev ninja-build
+      - run: cmake -S simulator -B simulator/build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBAMBU_SANITIZERS=ON
+      - run: cmake --build simulator/build --parallel 4
+      - run: ctest --test-dir simulator/build --output-on-failure
