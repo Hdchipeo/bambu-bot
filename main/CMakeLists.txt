@@ -1194,6 +1194,16 @@ if ("${size}" AND "${offset}")
     if(CONFIG_FLASH_DEFAULT_ASSETS)
         # Build default assets based on configuration
         build_default_assets_bin()
+        # `idf.py flash` builds the flash target, not ALL. Without this dependency
+        # Ninja can flash an old generated_assets.bin alongside a new application.
+        add_dependencies(flash generated_default_assets)
+        if(BOARD_TYPE STREQUAL "bambu-deskbot")
+            add_custom_target(bambu_assets_check
+                COMMAND python "${PROJECT_DIR}/scripts/verify_animation_assets.py" "${GENERATED_ASSETS_LOCAL_FILE}"
+                VERBATIM)
+            add_dependencies(bambu_assets_check generated_default_assets)
+            add_dependencies(flash bambu_assets_check)
+        endif()
         esptool_py_flash_to_partition(flash "assets" "${GENERATED_ASSETS_LOCAL_FILE}")
         message(STATUS "Generated default assets flash configured: ${GENERATED_ASSETS_LOCAL_FILE} -> assets partition")
     elseif(CONFIG_FLASH_CUSTOM_ASSETS)

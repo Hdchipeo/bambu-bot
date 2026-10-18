@@ -132,3 +132,21 @@ checksum assets và SHA-256 của bank trước khi đóng ZIP.
 
 **20 FPS là nhịp mục tiêu, chưa phải số đo trên LCD thật.** Bản 0.4.0 chưa nạp vào
 Desk-bot; chưa đo FPS, heap và tác động đồng thời của âm thanh/Wi-Fi/MQTT trên thiết bị.
+
+## Khi thấy `Animation bank: 0 bytes`
+
+Đây là renderer CPU dự phòng (nhịp mục tiêu 100 ms/10 FPS), chưa phải phát bank.
+App 0.4.0 có thể được nạp cùng assets cũ nếu chỉ chạy `idf.py flash` với build cũ:
+trước bản sửa dependency, target `flash` không kéo theo target tạo default assets.
+Log nạp 1.200.796 byte assets là gói cũ không có bank, dù flash thành công.
+
+Target flash hiện phụ thuộc vào tạo assets và kiểm tra checksum/SHA-256 bank trước
+khi gọi esptool. `idf.py flash monitor` sẽ dựng lại assets nếu cần. Log đúng phải
+có `Animation bank: 5533517 bytes`. Chạy kiểm tra trước khi nạp nếu cần:
+
+```sh
+python3 scripts/verify_animation_assets.py build/generated_assets.bin
+```
+
+Các file `._*.png` trên volume macOS cũng đã được lọc khỏi index emoji; đó là
+metadata AppleDouble, không phải ảnh emotion và không phải số đo FPS.

@@ -237,7 +237,12 @@ def process_emoji_collection(emoji_collection_dir, assets_dir):
     
     # Copy each image from input directory to build/assets directory
     for root, dirs, files in os.walk(emoji_collection_dir):
+        # External macOS volumes contain AppleDouble `._*` sidecars. They are
+        # metadata, not images; do not create dangling entries in index.json.
+        dirs[:] = [name for name in dirs if not name.startswith('.')]
         for file in files:
+            if file.startswith('.'):
+                continue
             if file.lower().endswith(('.png', '.gif')):
                 # Copy file
                 src_file = os.path.join(root, file)

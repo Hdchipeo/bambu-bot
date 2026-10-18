@@ -13,8 +13,12 @@ LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
 namespace {
 void LoadAnimationBank(bool available) {
     void* ptr=nullptr;size_t bytes=0;
-    if(available && Assets::GetInstance().GetAssetData("animations.bba",ptr,bytes) &&
-       bambu::ui::AnimationBank::SetData(static_cast<const uint8_t*>(ptr),bytes))return;
+    if(available){
+        if(!Assets::GetInstance().GetAssetData("animations.bba",ptr,bytes))
+            ESP_LOGW("BambuDisplay", "animations.bba missing: CPU fallback (100 ms target). Rebuild and flash generated_assets.bin");
+        else if(bambu::ui::AnimationBank::SetData(static_cast<const uint8_t*>(ptr),bytes))return;
+        else ESP_LOGE("BambuDisplay", "Invalid animation bank (%u bytes): CPU fallback",static_cast<unsigned>(bytes));
+    }
     bambu::ui::AnimationBank::SetData(nullptr,0);
 }
 }
