@@ -31,6 +31,8 @@ public:
     void SetDemo(bool demo);
     bool Apply(const std::string& payload, int64_t now_ms);
     std::string ToJson(int64_t now_ms) const;
+    // A copy for presentation: expired/disconnected fields are absent.
+    Snapshot GetFreshSnapshot(int64_t now_ms) const;
     std::string Summary(int64_t now_ms) const;
     std::vector<std::string> TakeEvents();
 

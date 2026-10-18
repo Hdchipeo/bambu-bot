@@ -30,10 +30,17 @@ int main() {
     assert(s.TakeEvents().empty());  // Boot while finished is not a finish event.
     assert(s.Apply(R"({"print":{"subtask_id":"one","gcode_state":"RUNNING","mc_percent":42,"bed_temper":60}})", 100));
     assert(s.Apply(R"({"print":{"nozzle_temper":220}})", 200));
+    auto fresh = s.GetFreshSnapshot(200);
+    assert(fresh.progress.value == 42 && fresh.nozzle.value == 220);
+    assert(!fresh.remaining.value);
     Json partial(s.ToJson(200));
     assert(partial.get("progress_pct")->valuedouble == 42);
     assert(cJSON_IsNull(partial.get("remaining_min")));
     assert(s.Apply(R"({"print":{"nozzle_temper":221}})", 30101));
+    auto expired = s.GetFreshSnapshot(30101);
+    assert(!expired.state.value && !expired.progress.value && !expired.bed.value);
+    assert(expired.nozzle.value == 221); // Fresh temperatures cannot revive expired job fields.
+    assert(!s.GetFreshSnapshot(99).nozzle.value);
     Json stale(s.ToJson(30101));
     assert(cJSON_IsTrue(stale.get("stale")));
     assert(cJSON_IsTrue(cJSON_GetObjectItem(stale.get("progress_pct_meta"), "stale")));
@@ -50,6 +57,7 @@ int main() {
 
     assert(s.Apply(R"({"print":{"gcode_state":"RUNNING"}})", 35000));
     s.SetConnection(false);
+    assert(!s.GetFreshSnapshot(35000).nozzle.value);
     s.SetConnection(true);
     assert(s.Apply(R"({"print":{"gcode_state":"FINISH"}})", 36000));
     assert(s.TakeEvents().empty());  // No transitions inferred over disconnect.

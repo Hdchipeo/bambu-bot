@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     if (ROOT / "main/bambu/local_config.h").exists():
         raise SystemExit("Refusing to package a build with local configuration. Remove it and rebuild the default demo first.")
+    description = json.loads((ROOT / "build/project_description.json").read_text())
+    version = description["project_version"]
     sources = {
         "bootloader.bin": "build/bootloader/bootloader.bin",
         "partition-table.bin": "build/partition_table/partition-table.bin",
@@ -19,14 +21,16 @@ def main():
         "bambu_bot.bin": "build/bambu_bot.bin",
         "generated_assets.bin": "build/generated_assets.bin",
     }
-    manifest = {"project": "bambu-bot", "version": "0.1.0", "profile": "deskbot-demo",
+    manifest = {"project": "bambu-bot", "version": version, "profile": "deskbot-demo",
                 "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "sha256": {name: hashlib.sha256((ROOT / src).read_bytes()).hexdigest()
                            for name, src in sources.items()}}
-    instructions = """Bambu Bot 0.1.0 - Desk-bot hardware DEMO
+    instructions = f"""Bambu Bot {version} - Desk-bot hardware DEMO
 
 ESP32-S3, flash 16 MB, octal PSRAM, ST7789 and I2S pinout from config.h.
 This is simulated printer data. Servo outputs are disabled.
+UI: short BOOT toggles chat; hold BOOT toggles black/green vs green/white theme.
+Theme is saved to NVS. The compact LCD intentionally hides the DEMO label.
 Firmware was compiled; physical hardware has not been verified.
 
 Install esptool 4.x in your Python environment or activate ESP-IDF 5.5.4.
@@ -39,7 +43,7 @@ Use the USB-UART/programming wiring of your existing Desk-bot.
 Existing NVS is not included or intentionally erased by this command.
 Check source README.md for Wi-Fi, AI activation, LAN configuration and limitations.
 """
-    target = ROOT / "dist/bambu-bot-deskbot-demo-v0.1.0.zip"
+    target = ROOT / f"dist/bambu-bot-deskbot-demo-v{version}.zip"
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, src in sources.items():

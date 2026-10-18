@@ -95,7 +95,7 @@ face.SetTelemetry(status);
 
 Component sở hữu root và timer; **hủy FaceView trước khi hủy parent/LVGL display**. Không copy/move component và không giữ nó trên stack của hàm đã trả về. `SetMessage` dành cho thông điệp ngắn, ví dụ mã kích hoạt; `SetMinimal` cho thumbnail biểu cảm; `FromXiaozhi` ánh xạ các tên emotion phổ biến của XiaoZhi và trả Idle khi tên chưa biết.
 
-Chưa gắn renderer mới vào `BambuDeskBot`/`Application`; firmware v0.1.0 vẫn là bản demo trước. Bước tích hợp tiếp theo cần nối trạng thái hội thoại và dữ liệu printer vào component, giữ đường hiển thị thông báo Wi-Fi/kích hoạt/lỗi, rồi đo RAM/FPS trên ESP32. Những số liệu hiệu năng ở Mac không thay thế kiểm chứng trên LCD thật.
+Firmware **v0.2.0** đã dùng renderer này trong `BambuDisplay` trên Desk-bot 280×240. Service chuyển snapshot đã lọc theo tuổi từng trường sang tiến độ/nhiệt độ; trạng thái hội thoại chọn Listening/Speaking/Thinking và trạng thái máy in chọn Printing/Completed/Warning/Error/Offline. Giữ nhấn BOOT để đổi theme và lưu NVS; MCP `light` → xanh/trắng, `dark` → đen/xanh. Thông báo Wi-Fi, kích hoạt và chat có lớp chữ dùng font đa ngôn ngữ của firmware; khi hết thông báo, UI trở lại số đo. Chưa kiểm chứng chạy thật hoặc đo RAM/FPS trên ESP32.
 
 ## Kiểm tra và xuất ảnh
 

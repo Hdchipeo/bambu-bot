@@ -6,6 +6,7 @@ Chạy `python3 scripts/test_host.py` để kiểm tra parser C++ đang dùng tr
 
 - Payload lỗi, quá dài, số ngoài miền và dữ liệu thiếu.
 - Gộp bản tin từng phần, giữ giá trị chưa được cập nhật; tuổi riêng theo trường.
+- Snapshot dùng cho LCD loại bỏ từng trường cũ và mọi trường khi disconnected; nhiệt độ mới không phục hồi tiến độ cũ.
 - Kết nối mới không mặc định trạng thái in.
 - `FINISH` lúc khởi động không tạo thông báo hoàn tất.
 - `RUNNING → PAUSE → FINISH` tạo một sự kiện khi dữ liệu còn mới.
@@ -19,12 +20,13 @@ Kiểm tra firmware: `idf.py build`. Việc build thành công chưa chứng min
 
 1. Build và nạp profile mặc định theo README, mở serial monitor.
 2. Kiểm tra log có `BambuBot: Starting DEMO printer source; servo outputs disabled`.
-3. Banner phía dưới màn hình phải có `DEMO A1`, tiến độ tăng mỗi 5 giây. Banner vẫn hiển thị khi chưa kích hoạt server AI.
-4. Sau khoảng 100 giây, phải xuất hiện popup hoàn tất một lần. Chu kỳ kế tiếp bắt đầu ở khoảng giây 120. Âm popup chỉ phát khi robot ở trạng thái idle để tránh chen vào hội thoại.
-5. Thiết lập Wi-Fi/kích hoạt server, nhấn BOOT và thử 10 lượt hội thoại tiếng Việt. Ghi nhận lỗi nhận dạng và âm thanh khi máy in đang chạy.
-6. Hỏi trạng thái máy in; trong log phía server xác nhận model gọi `self.bambu.get_printer_status`. Câu trả lời phải nêu rõ DEMO.
+3. Khuôn mặt LVGL và icon đầu phun/bàn nhiệt xuất hiện; tiến độ demo tăng mỗi 5 giây. Màn 280×240 bỏ nhãn DEMO nhưng đây vẫn là dữ liệu giả lập. Kiểm tra số đo trở lại sau thông báo kích hoạt/Wi-Fi.
+4. Giữ BOOT để đổi theme, reboot để kiểm tra NVS; thử MCP `self.screen.set_theme` với `light` / `dark`.
+5. Sau khoảng 100 giây, phải xuất hiện popup hoàn tất một lần. Chu kỳ kế tiếp bắt đầu ở khoảng giây 120. Âm popup chỉ phát khi robot ở trạng thái idle để tránh chen vào hội thoại.
+6. Thiết lập Wi-Fi/kích hoạt server, nhấn BOOT và thử 10 lượt hội thoại tiếng Việt. Ghi nhận lỗi nhận dạng và âm thanh khi máy in đang chạy.
+7. Hỏi trạng thái máy in; trong log phía server xác nhận model gọi `self.bambu.get_printer_status`. Câu trả lời phải nêu rõ DEMO.
 
-Không kỳ vọng cảm ứng, camera hay servo hoạt động trong profile này. Khuôn mặt/emoji và hội thoại là phần XiaoZhi, banner máy in là phần Bambu Bot.
+Không kỳ vọng cảm ứng, camera hay servo hoạt động trong profile này. Khuôn mặt LVGL là component dùng chung với Studio; hội thoại/audio vẫn từ XiaoZhi. Kiểm tra Listening khi nghe, Speaking khi nói và Printing/Completed khi idle; so sánh nhiệt độ, mất mạng và trường stale với MCP.
 
 ## Prompt trợ lý đề xuất
 
@@ -55,7 +57,7 @@ Chỉ xử lý `print_error` và nhóm trường cơ bản; chưa giải mã đ�
 ## Trạng thái kiểm chứng
 
 - Ngày 18/10/2026: host parser test với ASan/UBSan đạt; 6 bài kiểm tra cấu hình Python đạt.
-- Build ESP-IDF 5.5.4 đạt: app `0x2ad220` byte, còn `0x142de0` byte (32%) trong phân vùng ứng dụng.
+- Build ESP-IDF 5.5.4 đạt: firmware UI v0.2.0, app `0x2b4680` byte, còn `0x13b980` byte (31%) trong phân vùng ứng dụng.
 - Định nghĩa phần cứng khớp từng byte với `config.h` nguồn; SHA-256 ghi trong UPSTREAM.md.
 - SDK cài trên máy báo `v5.5.4-dirty`; đây là kết quả build trên môi trường hiện có, chưa phải xác nhận build trên SDK sạch hoặc kết quả CI GitHub.
 - Chưa xác nhận nạp/chạy trên Desk-bot, chưa thử MQTT với A1 thật.

@@ -5,6 +5,9 @@
 #include "application.h"
 #include "board.h"
 #include "display.h"
+#if CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD
+#include "boards/bambu-deskbot/bambu_display.h"
+#endif
 #include "mcp_server.h"
 #include "settings.h"
 #include "assets/lang_config.h"
@@ -25,9 +28,6 @@ esp_mqtt_client_handle_t client = nullptr;
 std::string report_topic, request_topic, incoming;
 int incoming_total = 0;
 std::atomic<bool> mqtt_connected{false};
-#ifdef HAVE_LVGL
-lv_obj_t* printer_label = nullptr;
-#endif
 int64_t Now() { return esp_timer_get_time() / 1000; }
 
 void OnMqtt(void*, esp_event_base_t, int32_t id, void* data) {
@@ -158,28 +158,25 @@ void Task(void*) {
         // UI work runs on the application task; no LVGL access from MQTT callbacks.
         const auto summary = state.Summary(now);
         const bool update = summary != last_summary;
-        if (update || !pending.empty()) {
-            auto batch = std::move(pending);
-            pending.clear();
-            Application::GetInstance().Schedule([summary, update, batch = std::move(batch)]() {
-                auto& app = Application::GetInstance();
-                auto display = Board::GetInstance().GetDisplay();
-                // A separate banner remains visible even before AI activation or while speaking.
-                if (update) {
-#ifdef HAVE_LVGL
-                    DisplayLockGuard lock(display);
-                    if (printer_label) lv_label_set_text(printer_label, summary.c_str());
+        // Deliver temperature-only updates and field expiry on every service tick.
+        auto batch = std::move(pending);
+        pending.clear();
+        Application::GetInstance().Schedule([summary, update, snapshot = state.GetFreshSnapshot(now), batch = std::move(batch)]() {
+            auto& app = Application::GetInstance();
+            auto display = Board::GetInstance().GetDisplay();
+#if CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD
+            static_cast<BambuDisplay*>(display)->UpdatePrinter(snapshot);
+#else
+            if (update) display->ShowNotification(summary, 1500);
 #endif
+            for (const auto& event : batch) {
+                display->ShowNotification(event, 8000);
+                if (app.GetDeviceState() == kDeviceStateIdle) {
+                    app.PlaySound(Lang::Sounds::OGG_POPUP);
                 }
-                for (const auto& event : batch) {
-                    display->ShowNotification(event, 8000);
-                    if (app.GetDeviceState() == kDeviceStateIdle) {
-                        app.PlaySound(Lang::Sounds::OGG_POPUP);
-                    }
-                }
-            });
-            last_summary = summary;
-        }
+            }
+        });
+        last_summary = summary;
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
@@ -187,21 +184,6 @@ void Task(void*) {
 
 void StartService() {
     state.SetDemo(BAMBU_DEMO);
-#ifdef HAVE_LVGL
-    {
-        auto display = Board::GetInstance().GetDisplay();
-        DisplayLockGuard lock(display);
-        printer_label = lv_label_create(lv_layer_top());
-        lv_obj_set_width(printer_label, display->width() - 16);
-        lv_label_set_long_mode(printer_label, LV_LABEL_LONG_SCROLL_CIRCULAR);
-        lv_obj_set_style_bg_color(printer_label, lv_color_hex(0x10251d), 0);
-        lv_obj_set_style_bg_opa(printer_label, LV_OPA_COVER, 0);
-        lv_obj_set_style_text_color(printer_label, lv_color_hex(0x8af0bd), 0);
-        lv_obj_set_style_pad_all(printer_label, 3, 0);
-        lv_obj_align(printer_label, LV_ALIGN_BOTTOM_MID, 0, -3);
-        lv_label_set_text(printer_label, BAMBU_DEMO ? "DEMO A1: Starting" : "A1: Disconnected");
-    }
-#endif
     if (std::strlen(BAMBU_OTA_URL) > 0) {
         Settings settings("wifi", true);
         settings.SetString("ota_url", BAMBU_OTA_URL);

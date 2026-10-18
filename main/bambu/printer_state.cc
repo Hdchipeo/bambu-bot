@@ -138,6 +138,17 @@ std::string PrinterState::ToJson(int64_t now) const {
     return result;
 }
 
+Snapshot PrinterState::GetFreshSnapshot(int64_t now) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto copy = snapshot_;
+    auto expire = [&](auto& field) {
+        if (!copy.connected || !Fresh(field.updated_ms, now)) field.value.reset();
+    };
+    expire(copy.state); expire(copy.job); expire(copy.progress); expire(copy.remaining);
+    expire(copy.nozzle); expire(copy.bed); expire(copy.error);
+    return copy;
+}
+
 std::string PrinterState::Summary(int64_t now) const {
     std::lock_guard<std::mutex> lock(mutex_);
     const std::string prefix = snapshot_.demo ? "DEMO A1: " : "A1: ";

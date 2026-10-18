@@ -13,7 +13,7 @@ brew install cmake ninja sdl2
 
 ![Bambu Bot emotions](docs/ui/emotion-sheet.png)
 
-Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; hiện là bản giả lập để duyệt thiết kế, chưa thay giao diện firmware bên dưới.
+Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; đã tích hợp vào firmware **v0.2.0** cho Desk-bot 280×240.
 
 ## Bản thử nghiệm hiện tại
 
@@ -23,8 +23,8 @@ Từ Desk-bot chỉ nhập nguyên file định nghĩa phần cứng vào [`main
 
 | Đã triển khai trong mã | Giới hạn hiện tại |
 | --- | --- |
-| Nền hội thoại XiaoZhi, giao diện tiếng Việt, BOOT bật/tắt hội thoại | Cần cấu hình server và kiểm tra mic/loa thực tế |
-| Demo tiến độ A1, mỗi chu kỳ 120 giây, luôn có nhãn DEMO | Không phải dữ liệu máy in thật |
+| Nền hội thoại XiaoZhi, 14 emotion LVGL, BOOT bật/tắt hội thoại | Cần cấu hình server và kiểm tra mic/loa thực tế |
+| Demo tiến độ A1, mỗi chu kỳ 120 giây; icon nhiệt độ và hai theme LCD | Không phải dữ liệu máy in thật |
 | MQTT TLS đọc trạng thái A1 qua LAN | Cần IP, serial, access code và CA PEM; chưa thử với A1 thật |
 | MCP `self.bambu.get_printer_status` | Server/model cần hỗ trợ công cụ MCP |
 | Gộp bản tin từng phần, tuổi dữ liệu theo trường, chống hoàn tất giả sau reconnect | Chưa lưu chống lặp sự kiện qua reboot |
@@ -44,9 +44,9 @@ idf.py build
 idf.py -p /dev/cu.YOUR_ESP32_PORT flash monitor
 ```
 
-Build mặc định chạy demo, không cần cấu hình máy in. Chọn đúng cổng serial của board; mic/loa của cấu hình test dùng GPIO19/20 nên lưu ý đây cũng là chân USB native của ESP32-S3. Thực hiện nạp theo cổng USB-UART và cách đấu dây đang có trên Desk-bot, không đổi dây theo sơ đồ Waveshare.
+Build mặc định chạy demo, không cần cấu hình máy in. Màn 280×240 không có nhãn DEMO theo thiết kế; dữ liệu trong bản build demo này vẫn hoàn toàn giả lập. Chọn đúng cổng serial của board; mic/loa của cấu hình test dùng GPIO19/20 nên lưu ý đây cũng là chân USB native của ESP32-S3. Thực hiện nạp theo cổng USB-UART và cách đấu dây đang có trên Desk-bot, không đổi dây theo sơ đồ Waveshare.
 
-Sau khi nạp, thiết lập Wi-Fi theo luồng XiaoZhi; nhấn BOOT trong lúc khởi động để vào cấu hình khi cần. Nút BOOT khi chạy bình thường bật/tắt hội thoại. Nếu dùng server mặc định, hoàn tất kích hoạt thiết bị theo mã hiển thị. Giao diện tiếng Việt không tự đặt ngôn ngữ ASR/TTS: cần chọn giọng và cấu hình trợ lý tiếng Việt trên server.
+Sau khi nạp, thiết lập Wi-Fi theo luồng XiaoZhi; nhấn BOOT trong lúc khởi động để vào cấu hình khi cần. Nhấn ngắn BOOT khi chạy bình thường bật/tắt hội thoại. **Nhấn giữ BOOT** đổi giữa nền đen/nét xanh Bambu và nền xanh Bambu/nét trắng; lựa chọn được lưu qua khởi động lại. MCP `self.screen.set_theme`: `dark` là đen/xanh, `light` là xanh/trắng. Nếu dùng server mặc định, hoàn tất kích hoạt thiết bị theo mã hiển thị. Giao diện tiếng Việt không tự đặt ngôn ngữ ASR/TTS: cần chọn giọng và cấu hình trợ lý tiếng Việt trên server.
 
 Hỏi “Máy in đang in đến đâu?” và yêu cầu trợ lý gọi `self.bambu.get_printer_status`. Trong demo, trợ lý phải nói rõ dữ liệu giả lập. Có prompt tham khảo trong [hướng dẫn test](docs/TESTING.md).
 
