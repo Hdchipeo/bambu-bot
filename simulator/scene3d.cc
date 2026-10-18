@@ -8,24 +8,24 @@ namespace bambu::studio {
 namespace {
 constexpr float pi=3.14159265359f;
 constexpr std::array<SceneInfo,18> info{{
- {"Game time","Bam plays a tiny game. Thumbs tap, a pixel heart floats above."},
+ {"Game time","Bam plays a tiny game. A floating controller taps along below the head."},
  {"Coffee break","A warm cup rises for a sip. Steam curls into the air."},
  {"Music lover","Headphones on. Bam nods to the beat as little notes drift past."},
  {"Curious explorer","A magnifying glass sweeps around, searching for a new discovery."},
  {"Sleepy afternoon","The head slowly droops, sleepy eyes close, then Bam wakes a little."},
  {"A visiting fly","A fly loops around Bam. The head follows its very unpredictable flight."},
  {"Printer check","Bam watches a miniature printer build one little green cube."},
- {"Print complete!","Arms up, a happy hop, confetti and a check mark. A print to celebrate."},
+ {"Print complete!","A happy head bounce, confetti and a check mark. A print to celebrate."},
  {"Mini racer","A tiny race car, rolling wheels and a road rushing underneath."},
  {"Bubble tea","A cup of pearls, a straw and a very unhurried sip."},
  {"Just chilling","Sunglasses, a drifting cloud and a slow, sunny sway."},
  {"Printer alert","A stopped printer, an alert sign and concerned eyes. A calm error scene."},
- {"Robot disco","A tiny dance floor. Alternating steps, waving arms and a disco sparkle."},
+ {"Robot disco","A tiny dance floor. The head bops and sways under a disco sparkle."},
  {"Plant parent","Bam waters a little sprout. Three drops and a very proud leaf."},
- {"Paper pilot","A paper airplane circles by. Bam follows it and waves."},
+ {"Paper pilot","A paper airplane circles by. Bam turns to follow its flight."},
  {"Little magician","A wand, a star and a levitating cube. No supports required."},
- {"Stretch break","Arms reach up and out. A slow stretch after a long print."},
- {"Hello, maker!","A cheerful wave and a floating heart for the person at the desk."},
+ {"Stretch break","A slow head tilt and neck stretch after a long print."},
+ {"Hello, maker!","A cheerful nod and a floating heart for the person at the desk."},
 }};
 static_assert(info.size()==static_cast<size_t>(Scene::Count));
 uint32_t Shade(uint32_t c,float f) {
@@ -106,7 +106,7 @@ void SceneView::Cup(V c,float r,float h,bool tea){
  for(int j=0;j<2;++j)for(int i=0;i<6;++i)Segment({c.x-5+j*10+std::sin(time_*2+i*.6f)*3,c.y-h/2-5-i*4,c.z},{c.x-5+j*10+std::sin(time_*2+(i+1)*.6f)*3,c.y-h/2-9-i*4,c.z},1,ink_,morph_*.5f);}
 }
 void SceneView::Head(float m,float time){
- float cy=-33*m,hw=85-16*m,hh=48-4*m,depth=1+35*m;
+ float cy=-8*m,hw=85,hh=48+5*m,depth=1+35*m;
  // Rounded extrusion with a bevel, sampled in 24 points per ring.
  std::array<V,24> front,back,inner;
  for(int i=0;i<24;++i){int corner=i/6;float a=(-pi+corner*pi/2)+(i%6)*pi/10;
@@ -138,18 +138,11 @@ void SceneView::Build(){
  if(scene_==Scene::Nap)pitch_=m*(.12f+.22f*(s+1));
  if(scene_==Scene::Music||scene_==Scene::Dance){bob_=m*beat*4;pitch_+=m*beat*.08f;}
  if(scene_==Scene::Complete)bob_-=m*std::max(0.f,std::sin(time_*3))*10;
- if(scene_==Scene::Printer||scene_==Scene::Error||scene_==Scene::Plant)shift_=-28*m;
- // Grounding shadow and a subtle floor ellipse.
- Disc({0,109,50},77,7,theme_==ui::Theme::Black?0x00451B:0x006D2A,m*.75f);
- RobotBox({0,39,8},{65,51*m,34*m},ink_,m);RobotBox({0,39,-10},{24,10*m,2},ui::kBambuGreen,m);
- for(float x:{-23.f,23.f}){RobotBox({x,83,3},{20,30*m,22},ink_,m);RobotBox({x,99,-8},{28,13*m,40},ink_,m);}
- V left=Transform({-62,54,-20}),right=Transform({62,54,-20});
- if(scene_==Scene::Game){left=Transform({-32,58,-77});right=Transform({32,58,-77});}
- if(scene_==Scene::Coffee||scene_==Scene::BubbleTea)right={55,26-std::max(0.f,s)*17,-72};
- if(scene_==Scene::Complete||scene_==Scene::Stretch){left=Transform({-79,-38-8*s,-10});right=Transform({79,-38-8*s,-10});}
- if(scene_==Scene::Wave||scene_==Scene::PaperPlane)right=Transform({87+8*beat,-22,-10});
- if(scene_==Scene::Dance){left=Transform({-82,20+beat*25,0});right=Transform({82,20-beat*25,0});}
- for(int i=0;i<2;++i){V shoulder=Transform({i?38.f:-38.f,25,7}),hand=i?right:left;Segment(shoulder,hand,11,Shade(ink_,.65f),m);Disc(hand,8,8,ink_,m);}
+ if(scene_==Scene::Printer||scene_==Scene::Complete||scene_==Scene::Error||scene_==Scene::Plant)shift_=-28*m;
+ if(scene_==Scene::Stretch){yaw_=m*std::sin(time_*.8f)*.38f;pitch_=m*std::sin(time_*.7f)*.16f;}
+ if(scene_==Scene::Wave){bob_+=m*std::sin(time_*3)*3;pitch_+=m*std::sin(time_*3)*.08f;}
+ // A hovering head and its soft shadow; no torso, arms, hands or legs.
+ Disc({shift_,87,50},57,5,theme_==ui::Theme::Black?0x00451B:0x006D2A,m*.65f);
  Head(m,time_);
  auto line=[&](V a,V b,float w=2,uint32_t c=0){Segment(a,b,w,c?c:ink_,m);};
  auto star=[&](float x,float y,float z,float r){for(int i=0;i<4;++i){float a=i*pi/2;line({x+std::cos(a)*r,y+std::sin(a)*r,z},{x,y,z},2);}};
@@ -157,12 +150,12 @@ void SceneView::Build(){
  case Scene::Game:
   Box({0,58,-80},{82,26,24},ink_,m);line({-27,53,-94},{-27,65,-94},3,0x003A16);line({-33,59,-94},{-21,59,-94},3,0x003A16);
   Disc({24,55+beat,-94},3,3,0x003A16,m);Disc({32,62-beat,-94},3,3,0x003A16,m);star(95,-45+beat*3,0,9);break;
- case Scene::Coffee:case Scene::BubbleTea: Cup({55,24-std::max(0.f,s)*17,-78},14,33,scene_==Scene::BubbleTea);break;
+ case Scene::Coffee:case Scene::BubbleTea: Cup({76,49-std::max(0.f,s)*20,-78},14,33,scene_==Scene::BubbleTea);break;
  case Scene::Music:
-  for(int i=0;i<16;++i){float a=pi+i*pi/16,b=pi+(i+1)*pi/16;line(Transform({80*std::cos(a),-30+62*std::sin(a),0}),Transform({80*std::cos(b),-30+62*std::sin(b),0}),6);}
-  RobotBox({-79,-30,0},{14,35,30},ink_,m);RobotBox({79,-30,0},{14,35,30},ink_,m);
+  for(int i=0;i<16;++i){float a=pi+i*pi/16,b=pi+(i+1)*pi/16;line(Transform({94*std::cos(a),-8+73*std::sin(a),0}),Transform({94*std::cos(b),-8+73*std::sin(b),0}),6);}
+  RobotBox({-94,-8,0},{14,35,30},ink_,m);RobotBox({94,-8,0},{14,35,30},ink_,m);
   for(int j=0;j<3;++j){float x=-105+j*103,y=-58-std::fmod(time_*16+j*22,38.f);Disc({x,y,0},5,3,ink_,m);line({x+4,y,0},{x+4,y-16,0},2);line({x+4,y-16,0},{x+11,y-12,0},2);}break;
- case Scene::Explore:{float x=70+s*12,y=10+beat*5;for(int i=0;i<24;++i){float a=i*pi/12,b=(i+1)*pi/12;line({x+19*std::cos(a),y+19*std::sin(a),-85},{x+19*std::cos(b),y+19*std::sin(b),-85},3);}line({x-14,y+14,-85},{x-35,y+39,-85},6);star(-95,-65,0,6);break;}
+ case Scene::Explore:{float x=91+s*9,y=23+beat*5;for(int i=0;i<24;++i){float a=i*pi/12,b=(i+1)*pi/12;line({x+19*std::cos(a),y+19*std::sin(a),-85},{x+19*std::cos(b),y+19*std::sin(b),-85},3);}line({x-14,y+14,-85},{x-35,y+39,-85},6);star(-95,-65,0,6);break;}
  case Scene::Nap:
   for(int j=0;j<3;++j){float x=70+j*12,y=-80-j*14-std::fmod(time_*8,12.f);line({x,y,0},{x+8,y,0});line({x+8,y,0},{x,y+9,0});line({x,y+9,0},{x+8,y+9,0});}break;
  case Scene::Fly:{float x=std::sin(time_*1.7f)*107,y=-57+std::sin(time_*3.4f)*40;Disc({x,y,-100},5,3,0xA9C8B5,m);Disc({x-3,y-5,-99},5,2+std::abs(beat)*3,0xDDFEEA,m*.6f);Disc({x+4,y-5,-99},5,3,0xDDFEEA,m*.6f);for(int i=1;i<5;++i)Disc({x-i*8,y+std::sin(time_*3-i)*6,-99},1,1,ink_,m*.3f);break;}

@@ -1,6 +1,8 @@
 # Bambu Bot — 3D idle stories
 
-Bản thử nghiệm **Emotion Studio 0.3.0**, triển khai trước trên simulator macOS. Bấm **3D scenes** hoặc **D** để chuyển từ bộ 14 emotion 2D sang bộ 18 hoạt cảnh 3D. Chọn một cảnh để chạy phần mở đầu: mặt phẳng dần có độ dày, thân/tay/chân và đạo cụ xuất hiện trong **1,2 giây**, sau đó bot bắt đầu hoạt động.
+Bản thử nghiệm **Emotion Studio 0.3.1**, triển khai trước trên simulator macOS. Bấm **3D scenes** hoặc **D** để chuyển từ bộ 14 emotion 2D sang bộ 18 hoạt cảnh 3D. Chọn một cảnh để chạy phần mở đầu: mặt phẳng dần có độ dày, đầu robot lớn hơn được đặt giữa màn hình và đạo cụ xuất hiện trong **1,2 giây**, sau đó bot bắt đầu hoạt động.
+
+Từ **0.3.1**, robot chỉ có **phần đầu**; đã bỏ toàn bộ thân, tay, bàn tay, chân và bàn chân. Đầu được phóng lớn, đặt lại gần giữa màn hình; đạo cụ vẫn chuyển động độc lập quanh đầu.
 
 Đây là nhân vật 3D phong cách low-poly: các đỉnh tọa độ XYZ được xoay, chiếu phối cảnh, tô sáng và kiểm tra độ sâu từng pixel bằng CPU. Khung hình được đưa vào LVGL như một ảnh động sinh tại runtime; không dùng video/GIF có sẵn, OpenGL hoặc dịch vụ AI. Các đường cong/đạo cụ là hình học đơn giản để thử hướng mỹ thuật và chuyển động trước.
 
@@ -31,24 +33,24 @@ Các chuyển động diễn ra sau phần mở đầu chung. Bot luôn giữ đ
 
 | Cảnh trong Studio | Diễn biến |
 | --- | --- |
-| Game time | Hai tay đưa tay cầm ra trước → nhịp nút bấm thay đổi → bot lắc nhẹ, biểu tượng game lơ lửng. |
-| Coffee break | Cầm cốc có quai → cốc nhích lên để nhấp → hạ cốc; các vệt hơi uốn nhẹ phía trên. |
+| Game time | Tay cầm game lơ lửng dưới đầu → nhịp nút bấm thay đổi → bot lắc nhẹ, biểu tượng game lơ lửng. |
+| Coffee break | Cốc có quai lơ lửng cạnh đầu → cốc nhích lên để nhấp → hạ cốc; các vệt hơi uốn nhẹ phía trên. |
 | Music lover | Đeo tai nghe → gật đầu theo nhịp → các nốt nhạc trôi lên. |
 | Curious explorer | Nghiêng đầu → đưa kính lúp quét trước mặt → điểm sáng gợi một phát hiện mới. |
 | Sleepy afternoon | Mắt khép → đầu cúi dần → nhích tỉnh rồi lại gật; chữ z trôi lên. |
 | A visiting fly | Ruồi bay vòng số 8 → bot quay đầu theo → cánh ruồi rung và có dấu đường bay. |
 | Printer check | Bot đứng cạnh máy in thu nhỏ → đầu in di chuyển ngang → khối in nhô lên theo chu kỳ minh họa. |
-| Print complete! | Mắt cười → giơ hai tay, nhảy nhẹ → dấu hoàn tất và confetti rơi cạnh máy in. |
-| Mini racer | Bot ngồi sau thân xe nhỏ → vạch tốc độ lướt qua → dấu trên bánh quay liên tục. |
-| Bubble tea | Cầm ly có trân châu và ống hút → nâng ly → hạ ly, lắc đầu thỏa mãn. |
+| Print complete! | Mắt cười → đầu nhảy nhẹ → dấu hoàn tất và confetti rơi cạnh máy in. |
+| Mini racer | Đầu bot nhô lên trên xe nhỏ → vạch tốc độ lướt qua → dấu trên bánh quay liên tục. |
+| Bubble tea | Ly có trân châu và ống hút lơ lửng cạnh đầu → nâng ly → hạ ly, lắc đầu thỏa mãn. |
 | Just chilling | Đeo kính râm → đung đưa chậm → mây trôi dưới nắng nhỏ. |
 | Printer alert | Máy in dừng đầu phun → dấu chấm than đỏ xuất hiện → bot có mắt X và nhìn về phía máy. |
-| Robot disco — bổ sung | Nhún đầu/thân theo nhịp → hai tay đổi độ cao → các ô sàn đổi độ sáng. |
-| Plant parent — bổ sung | Đưa bình tưới về phía chậu → ba giọt nước rơi → mầm cây có hai lá. |
-| Paper pilot — bổ sung | Máy bay giấy lượn theo quỹ đạo → bot quay đầu theo → giơ tay chào máy bay. |
-| Little magician — bổ sung | Giơ đũa phép → tia sao ở đầu đũa → khối lập phương nhấp nhô trên không. |
-| Stretch break — bổ sung | Nâng cả hai tay qua đầu → duỗi nhịp chậm → thả về nhịp vươn tiếp theo. |
-| Hello, maker! — bổ sung | Mắt cười → vẫy một tay → trái tim nhỏ bên cạnh khuôn mặt. |
+| Robot disco — bổ sung | Nhún và nghiêng đầu theo nhịp → các ô sàn đổi độ sáng. |
+| Plant parent — bổ sung | Bình tưới nghiêng về phía chậu → ba giọt nước rơi → mầm cây có hai lá. |
+| Paper pilot — bổ sung | Máy bay giấy lượn theo quỹ đạo → bot quay đầu theo → gật đầu chào máy bay. |
+| Little magician — bổ sung | Đũa phép lơ lửng → tia sao ở đầu đũa → khối lập phương nhấp nhô trên không. |
+| Stretch break — bổ sung | Nghiêng đầu sang hai phía → ngẩng/cúi chậm → trở về giữa. |
+| Hello, maker! — bổ sung | Mắt cười → gật đầu chào → trái tim nhỏ bên cạnh khuôn mặt. |
 
 ![18 3D stories](ui/3d-scenes.png)
 

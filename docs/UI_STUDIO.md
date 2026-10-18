@@ -4,9 +4,9 @@
 
 ![Emotion library](ui/emotion-sheet.png)
 
-## 3D idle stories — thử nghiệm 0.3.0
+## 3D idle stories — thử nghiệm 0.3.1
 
-Bấm **3D scenes** ở thanh trên hoặc phím **D** để mở 18 hoạt cảnh low-poly với intro 2D → 3D. Phím **B** phát lại intro; **Space** duyệt tự động. Có chơi game, cà phê, âm nhạc, tìm tòi, ngủ gật, ruồi, kiểm tra máy in, hoàn tất/lỗi, đua xe, trà sữa, chill và sáu cảnh bổ sung. Xem [bộ kịch bản và giới hạn 3D](3D_SCENES.md). Phần thử nghiệm này chỉ chạy trong simulator, chưa tích hợp vào firmware.
+Bấm **3D scenes** ở thanh trên hoặc phím **D** để mở 18 hoạt cảnh low-poly **chỉ phần đầu robot** với intro 2D → 3D. Phím **B** phát lại intro; **Space** duyệt tự động. Có chơi game, cà phê, âm nhạc, tìm tòi, ngủ gật, ruồi, kiểm tra máy in, hoàn tất/lỗi, đua xe, trà sữa, chill và sáu cảnh bổ sung. Xem [bộ kịch bản và giới hạn 3D](3D_SCENES.md). Phần thử nghiệm này chỉ chạy trong simulator, chưa tích hợp vào firmware.
 
 ![3D Studio](ui/studio-3d.png)
 
@@ -35,7 +35,7 @@ Nếu chưa build firmware và chưa có `managed_components/lvgl__lvgl`, CMake 
 
 ## Điều khiển
 
-Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản cũ, thoát cửa sổ cũ rồi mở lại bản **0.3.0**; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
+Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản cũ, thoát cửa sổ cũ rồi mở lại bản **0.3.1**; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
 
 | Thao tác | Kết quả |
 | --- | --- |
