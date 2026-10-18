@@ -20,13 +20,13 @@ Kiểm tra firmware: `idf.py build`. Việc build thành công chưa chứng min
 
 1. Build và nạp profile mặc định theo README, mở serial monitor.
 2. Kiểm tra log có `BambuBot: Starting DEMO printer source; servo outputs disabled`.
-3. Khuôn mặt LVGL và icon đầu phun/bàn nhiệt xuất hiện; tiến độ demo tăng mỗi 5 giây. Màn 280×240 bỏ nhãn DEMO nhưng đây vẫn là dữ liệu giả lập. Kiểm tra số đo trở lại sau thông báo kích hoạt/Wi-Fi.
+3. Đầu robot 3D và ba icon tiến độ/đầu phun/bàn nhiệt xuất hiện; tiến độ demo tăng mỗi 5 giây. Màn 280×240 bỏ nhãn DEMO nhưng đây vẫn là dữ liệu giả lập. Kiểm tra số đo trở lại sau thông báo kích hoạt/Wi-Fi.
 4. Giữ BOOT để đổi theme, reboot để kiểm tra NVS; thử MCP `self.screen.set_theme` với `light` / `dark`.
 5. Sau khoảng 100 giây, phải xuất hiện popup hoàn tất một lần. Chu kỳ kế tiếp bắt đầu ở khoảng giây 120. Âm popup chỉ phát khi robot ở trạng thái idle để tránh chen vào hội thoại.
 6. Thiết lập Wi-Fi/kích hoạt server, nhấn BOOT và thử 10 lượt hội thoại tiếng Việt. Ghi nhận lỗi nhận dạng và âm thanh khi máy in đang chạy.
 7. Hỏi trạng thái máy in; trong log phía server xác nhận model gọi `self.bambu.get_printer_status`. Câu trả lời phải nêu rõ DEMO.
 
-Không kỳ vọng cảm ứng, camera hay servo hoạt động trong profile này. Khuôn mặt LVGL là component dùng chung với Studio; hội thoại/audio vẫn từ XiaoZhi. Kiểm tra Listening khi nghe, Speaking khi nói và Printing/Completed khi idle; so sánh nhiệt độ, mất mạng và trường stale với MCP.
+Không kỳ vọng cảm ứng, camera hay servo hoạt động trong profile này. Đầu 3D là component dùng chung với Studio; hội thoại/audio vẫn từ XiaoZhi. Kiểm tra Listening khi nghe, Speaking khi nói và Printing/Completed khi idle; so sánh nhiệt độ, mất mạng và trường stale với MCP.
 
 ## Prompt trợ lý đề xuất
 
@@ -54,10 +54,18 @@ Prompt này là hướng dẫn cấu hình, không tự thay đổi server hoặ
 
 Chỉ xử lý `print_error` và nhóm trường cơ bản; chưa giải mã đầy đủ HMS, AMS, phase/substage, metadata vật liệu hoặc camera. Chưa có hàng đợi TTS chủ động, chế độ giờ yên lặng hay lưu sự kiện bền vững qua reboot.
 
+## Kiểm tra profile 3D
+
+- Log khởi tạo có `BambuDisplay: 3D head UI: 140x120 raster, 280x240 native HUD; 100 ms frame target`.
+- Khi printer IDLE và robot idle, cảnh vui đổi mỗi 12 giây. Khi RUNNING/PREPARE, ưu tiên cảnh máy in; FINISH → Completed; mã lỗi mới/FAILED → Error. PAUSE giữ máy in đứng yên.
+- Biểu cảm AI `error`/`completed` khi không có trạng thái printer tương ứng chỉ đổi đầu, không tự phát cảnh lỗi/hoàn tất máy in.
+- Kiểm tra head-only, icon máy in theo ảnh mẫu, hai theme và lớp chữ Wi-Fi/kích hoạt/chat.
+- Đo FPS, heap nội/PSRAM, độ trễ thoại và MQTT trên thiết bị trước khi nâng độ phân giải hoặc tốc độ animation.
+
 ## Trạng thái kiểm chứng
 
 - Ngày 18/10/2026: host parser test với ASan/UBSan đạt; 6 bài kiểm tra cấu hình Python đạt.
-- Build ESP-IDF 5.5.4 đạt: firmware UI v0.2.0, app `0x2b4680` byte, còn `0x13b980` byte (31%) trong phân vùng ứng dụng.
+- Build ESP-IDF 5.5.4 đạt: firmware 3D v0.3.0, app `0x2b9990` byte, còn `0x136670` byte (31%) trong phân vùng ứng dụng.
 - Định nghĩa phần cứng khớp từng byte với `config.h` nguồn; SHA-256 ghi trong UPSTREAM.md.
 - SDK cài trên máy báo `v5.5.4-dirty`; đây là kết quả build trên môi trường hiện có, chưa phải xác nhận build trên SDK sạch hoặc kết quả CI GitHub.
 - Chưa xác nhận nạp/chạy trên Desk-bot, chưa thử MQTT với A1 thật.

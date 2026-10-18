@@ -34,12 +34,12 @@ target_compile_definitions(bambu_lvgl PUBLIC
     LV_KCONFIG_IGNORE LV_LVGL_H_INCLUDE_SIMPLE)
 target_compile_options(bambu_lvgl PRIVATE -Wno-deprecated-declarations)
 
-add_library(bambu_face STATIC ../ui/bambu_face.cc)
+add_library(bambu_face STATIC ../ui/bambu_face.cc ../ui/scene3d.cc)
 target_include_directories(bambu_face PUBLIC ../ui)
 target_link_libraries(bambu_face PUBLIC bambu_lvgl)
 target_compile_options(bambu_face PRIVATE -Wall -Wextra -Werror)
 
-add_executable(bambu_studio MACOSX_BUNDLE main.cc scene3d.cc)
+add_executable(bambu_studio MACOSX_BUNDLE main.cc)
 target_link_libraries(bambu_studio PRIVATE bambu_face SDL2::SDL2)
 target_compile_options(bambu_studio PRIVATE -Wall -Wextra -Werror)
 target_compile_definitions(bambu_studio PRIVATE BAMBU_STUDIO_VERSION="${PROJECT_VERSION}")

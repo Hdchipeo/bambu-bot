@@ -15,7 +15,7 @@ brew install cmake ninja sdl2
 
 Studio **0.3.3** bổ sung [18 kịch bản 3D](docs/3D_SCENES.md) chỉ phần đầu robot, với chuyển 2D → 3D, đạo cụ động và hai theme. Mở bằng nút **3D scenes** hoặc phím **D**; đây là bản thử nghiệm simulator.
 
-Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; đã tích hợp vào firmware **v0.2.0** cho Desk-bot 280×240.
+Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; đã tích hợp giao diện **3D chỉ phần đầu** vào firmware **v0.3.0** cho Desk-bot 280×240.
 
 ## Bản thử nghiệm hiện tại
 
@@ -25,13 +25,19 @@ Từ Desk-bot chỉ nhập nguyên file định nghĩa phần cứng vào [`main
 
 | Đã triển khai trong mã | Giới hạn hiện tại |
 | --- | --- |
-| Nền hội thoại XiaoZhi, 14 emotion LVGL, BOOT bật/tắt hội thoại | Cần cấu hình server và kiểm tra mic/loa thực tế |
+| Hội thoại XiaoZhi, đầu robot 3D, icon máy in theo ảnh mẫu, icon đầu phun/bàn nhiệt | Cần cấu hình server và kiểm tra mic/loa thực tế |
 | Demo tiến độ A1, mỗi chu kỳ 120 giây; icon nhiệt độ và hai theme LCD | Không phải dữ liệu máy in thật |
 | MQTT TLS đọc trạng thái A1 qua LAN | Cần IP, serial, access code và CA PEM; chưa thử với A1 thật |
 | MCP `self.bambu.get_printer_status` | Server/model cần hỗ trợ công cụ MCP |
 | Gộp bản tin từng phần, tuổi dữ liệu theo trường, chống hoàn tất giả sau reconnect | Chưa lưu chống lặp sự kiện qua reboot |
 | Popup và âm báo khi hoàn tất hoặc có `print_error` mới | Chưa có giọng nói thông báo chủ động, giải mã HMS hay RAG Wiki |
 | Không tự nạp bản firmware XiaoZhi do server discovery đề nghị | OTA discovery vẫn dùng để lấy cấu hình hội thoại/kích hoạt |
+
+Firmware v0.3.0 dùng chung `ui/scene3d.*` và `ui/printer_icon.h` với simulator. Có 15 cảnh vui luân phiên mỗi 12 giây khi idle; dữ liệu máy in ưu tiên cảnh Printing / Completed / Error. Lỗi/kết thúc do dữ liệu máy in xác nhận, không do biểu cảm AI hoặc vòng idle tự tạo. Khi nghe/nói, đầu robot đổi biểu cảm và tạm ẩn đạo cụ idle.
+
+Để giảm RAM/CPU, firmware render 3D **140×120**, phóng lên **280×240**; chữ, icon và thanh tiến độ vẫn vẽ ở 280×240. Hai buffer màu/depth dùng **134.400 byte**, cộng pool hình học và LVGL. Timer đặt 100 ms/frame, chưa phải FPS đã đo trên thiết bị. Giữ nguyên driver/pin LCD và BOOT.
+
+![Firmware 3D profile](docs/ui/firmware-3d-green.png)
 
 **Servo chưa bật:** `config.h` nguồn không định nghĩa chân servo. Không tự gán chân hoặc bật GPIO đèn mẫu của upstream.
 

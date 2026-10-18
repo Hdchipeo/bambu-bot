@@ -31,7 +31,7 @@ Phần nền và nét chính dùng Bambu Green `#00AE42`, đen hoặc trắng th
 
 Ba nhóm icon/số cố định dưới hoạt cảnh: **bản in → tiến độ %**, **đầu phun → °C**, **bàn nhiệt → °C**, cùng thanh tiến độ mảnh bên dưới. Kích thước và khoảng cách được căn riêng cho 466×466 và 280×240. Các nét theo màu theme xanh Bambu hoặc trắng.
 
-Từ **0.3.3**, icon bản in được vẽ lại theo ảnh máy in 3D người dùng cung cấp: khung máy, thanh dẫn hướng, đầu phun, khối lập phương, bàn in, màn hình điều khiển, núm tròn và chân đế. Hình học dùng chung cho LVGL (`simulator/printer_icon.h`) và [SVG phóng lớn](ui/printer-icon.svg); màu icon vẫn theo theme.
+Từ **0.3.3**, icon bản in được vẽ lại theo ảnh máy in 3D người dùng cung cấp: khung máy, thanh dẫn hướng, đầu phun, khối lập phương, bàn in, màn hình điều khiển, núm tròn và chân đế. Hình học dùng chung cho LVGL (`ui/printer_icon.h`) và [SVG phóng lớn](ui/printer-icon.svg); màu icon vẫn theo theme.
 
 ![Printer icon reference redraw](ui/printer-icon.png)
 
@@ -66,14 +66,18 @@ Các chuyển động diễn ra sau phần mở đầu chung. Bot luôn giữ đ
 
 ## Phạm vi bản thử nghiệm
 
-Cảnh hoàn tất và lỗi được chọn bằng tay trong simulator; chưa phải phản ứng với máy in thật. Bộ này **chưa được đưa vào firmware v0.2.0**. Giao diện 2D đã tích hợp trên firmware vẫn giữ nguyên.
+Simulator cho phép chọn cảnh thủ công. Từ firmware **v0.3.0**, renderer đã tích hợp vào Desk-bot: 15 cảnh idle tự đổi mỗi 12 giây; ba cảnh máy in được ưu tiên theo dữ liệu in/hoàn tất/lỗi. Biểu cảm AI không đủ để phát cảnh lỗi hoặc hoàn tất máy in. Khi nghe/nói/kết nối, đầu dùng biểu cảm hội thoại, ẩn đạo cụ idle. Pause hiển thị máy in dừng chuyển động. Ngủ dùng đầu ngủ gật và dừng animation.
 
-Bản 3D dùng hai buffer màu/độ sâu cùng kích thước LCD: khoảng 1,66 MiB ở 466×466 hoặc 525 KiB ở 280×240, cộng bộ nhớ hình học, LVGL và SDL. Vì vậy chưa thể coi đây là ngân sách RAM/FPS đã đạt trên ESP32; bước tiếp theo cần đo trên thiết bị, giảm độ phân giải render hoặc rút gọn mô hình. Shader ánh sáng đơn giản, không có phản xạ vật lý; kính lúp/ly chỉ minh họa, không khúc xạ thật.
+Renderer dùng chung ở `ui/scene3d.h`, `ui/scene3d.cc`, icon ở `ui/printer_icon.h`; `ui/scene_policy.h` chọn cảnh tự động. Driver/pin phần cứng không đổi. Simulator mặc định render đầy đủ: hai buffer màu/depth khoảng 1,66 MiB cho 466×466 hoặc 525 KiB cho 280×240. Firmware chọn `render_divisor=2`, buffer 140×120 dùng **134.400 byte**, rồi LVGL phóng lên 280×240; icon/chữ/thanh tiến độ giữ độ phân giải gốc. Timer firmware đặt **100 ms**, không phải cam kết FPS thực tế. Pool 3.072 primitive, buffer và widget được cấp phát một lần, tái sử dụng qua các frame.
 
-Renderer ở `simulator/scene3d.h` và `simulator/scene3d.cc`. Chỉ biên dịch cùng target simulator; không sửa pin, LCD driver hoặc luồng dữ liệu firmware. Pool hình học cố định 3.072 primitive, buffer được cấp phát khi tạo view và tái sử dụng qua các frame. Các label, icon và thanh tiến độ LVGL được tạo một lần, không tạo/xóa widget theo frame.
+| Firmware: đen/xanh | Firmware: xanh/trắng |
+| --- | --- |
+| ![Black](ui/firmware-3d-black.png) | ![Green](ui/firmware-3d-green.png) |
+
+Ảnh trên được render bằng đúng cấu hình firmware trong simulator, chưa phải ảnh chụp thiết bị. Chưa nạp thử, đo FPS/RAM tổng hoặc kiểm chứng thoại + MQTT + 3D đồng thời trên ESP32. Ánh sáng đơn giản, không có phản xạ/khúc xạ vật lý. Thông báo Wi-Fi/kích hoạt/chat vẫn dùng lớp font đa ngôn ngữ, tạm phủ dòng telemetry rồi trả lại giao diện khi hết thông báo.
 
 ## Kiểm tra và xuất ảnh
 
-Chạy build/CTest như [UI_STUDIO.md](UI_STUDIO.md). Smoke test đi qua click SDL/LVGL của mode 3D và cả 18 nút cảnh, hai theme và hai màn hình; kiểm tra các mốc 0 / 600 / 1.200 / 2.500 / 5.000 / 9.000 / 17.000 ms, không tràn pool hình học, không tăng số widget và có thể trở lại 2D. Kiểm tra tạm dừng/tiếp tục và giữ thời điểm khi đổi display. Bản 0.3.2 kiểm tra thêm đơn vị và giá trị dòng thông số 3D, ẩn số cũ khi stale/disconnected. Bài kiểm tra cũ của emotion, input, thông báo, offline/stale vẫn chạy.
+Chạy build/CTest như [UI_STUDIO.md](UI_STUDIO.md). Smoke test đi qua click SDL/LVGL của mode 3D và cả 18 nút cảnh, hai theme và hai màn hình; kiểm tra các mốc 0 / 600 / 1.200 / 2.500 / 5.000 / 9.000 / 17.000 ms, không tràn pool hình học, không tăng số widget và có thể trở lại 2D. Kiểm tra tạm dừng/tiếp tục và giữ thời điểm khi đổi display. Bản 0.3.2 kiểm tra thêm đơn vị và giá trị dòng thông số 3D, ẩn số cũ khi stale/disconnected. Bài kiểm tra cũ của emotion, input, thông báo, offline/stale vẫn chạy. Kiểm tra tích hợp firmware còn chạy đúng profile 140×120, giới hạn buffer 134.400 byte, vị trí đầu sau khi phóng lên LCD, 14 biểu cảm, nhãn real/demo và ưu tiên cảnh máy in.
 
 Lệnh `--headless --output dist/ui-preview` xuất thêm 72 ảnh cảnh LCD (`scene-<index>-<display>-<theme>.bmp`), ảnh `studio-3d.bmp` và 80 frame của cảnh cà phê trong thư mục `animation/`. GIF trong tài liệu được ghép từ các frame render đó; không phải tài sản dùng để chạy UI.

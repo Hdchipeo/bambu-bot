@@ -6,7 +6,7 @@
 
 ## 3D idle stories — thử nghiệm 0.3.3
 
-Bấm **3D scenes** ở thanh trên hoặc phím **D** để mở 18 hoạt cảnh low-poly **chỉ phần đầu robot** với intro 2D → 3D. Phím **B** phát lại intro; **Space** duyệt tự động. Có chơi game, cà phê, âm nhạc, tìm tòi, ngủ gật, ruồi, kiểm tra máy in, hoàn tất/lỗi, đua xe, trà sữa, chill và sáu cảnh bổ sung. Xem [bộ kịch bản và giới hạn 3D](3D_SCENES.md). Phần thử nghiệm này chỉ chạy trong simulator, chưa tích hợp vào firmware.
+Bấm **3D scenes** ở thanh trên hoặc phím **D** để mở 18 hoạt cảnh low-poly **chỉ phần đầu robot** với intro 2D → 3D. Phím **B** phát lại intro; **Space** duyệt tự động. Có chơi game, cà phê, âm nhạc, tìm tòi, ngủ gật, ruồi, kiểm tra máy in, hoàn tất/lỗi, đua xe, trà sữa, chill và sáu cảnh bổ sung. Xem [bộ kịch bản và giới hạn 3D](3D_SCENES.md). Từ firmware **v0.3.0**, renderer này cũng chạy trong Desk-bot với cấu hình giảm độ phân giải, xem [tích hợp firmware](3D_SCENES.md#phạm-vi-bản-thử-nghiệm).
 
 ![3D Studio](ui/studio-3d.png)
 
@@ -101,7 +101,7 @@ face.SetTelemetry(status);
 
 Component sở hữu root và timer; **hủy FaceView trước khi hủy parent/LVGL display**. Không copy/move component và không giữ nó trên stack của hàm đã trả về. `SetMessage` dành cho thông điệp ngắn, ví dụ mã kích hoạt; `SetMinimal` cho thumbnail biểu cảm; `FromXiaozhi` ánh xạ các tên emotion phổ biến của XiaoZhi và trả Idle khi tên chưa biết.
 
-Firmware **v0.2.0** đã dùng renderer này trong `BambuDisplay` trên Desk-bot 280×240. Service chuyển snapshot đã lọc theo tuổi từng trường sang tiến độ/nhiệt độ; trạng thái hội thoại chọn Listening/Speaking/Thinking và trạng thái máy in chọn Printing/Completed/Warning/Error/Offline. Giữ nhấn BOOT để đổi theme và lưu NVS; MCP `light` → xanh/trắng, `dark` → đen/xanh. Thông báo Wi-Fi, kích hoạt và chat có lớp chữ dùng font đa ngôn ngữ của firmware; khi hết thông báo, UI trở lại số đo. Chưa kiểm chứng chạy thật hoặc đo RAM/FPS trên ESP32.
+Firmware v0.2.0 dùng renderer 2D này; **v0.3.0** chuyển sang renderer 3D dùng chung `ui/scene3d.*` và icon mới trong `BambuDisplay` trên Desk-bot 280×240. Service chuyển snapshot đã lọc theo tuổi từng trường sang tiến độ/nhiệt độ; trạng thái hội thoại chọn Listening/Speaking/Thinking và trạng thái máy in chọn Printing/Completed/Warning/Error/Offline. Giữ nhấn BOOT để đổi theme và lưu NVS; MCP `light` → xanh/trắng, `dark` → đen/xanh. Thông báo Wi-Fi, kích hoạt và chat có lớp chữ dùng font đa ngôn ngữ của firmware; khi hết thông báo, UI trở lại số đo. Chưa kiểm chứng chạy thật hoặc đo RAM/FPS trên ESP32.
 
 ## Kiểm tra và xuất ảnh
 

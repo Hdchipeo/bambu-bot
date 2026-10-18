@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <vector>
 
-namespace bambu::studio {
+namespace bambu::ui {
 enum class Scene { Game, Coffee, Music, Explore, Nap, Fly, Printer, Complete, Race,
     BubbleTea, Chill, Error, Dance, Plant, PaperPlane, Magic, Stretch, Wave, Count };
 struct SceneInfo { const char* name; const char* description; };
@@ -16,12 +16,13 @@ const SceneInfo& DescribeScene(Scene scene);
 // Real 3D vertices, perspective projection, lighting and per-pixel depth testing.
 class SceneView {
 public:
-    SceneView(lv_obj_t* parent,int width,int height,bool round);
+    SceneView(lv_obj_t* parent,int width,int height,bool round,int render_divisor=1,uint32_t frame_period_ms=33);
     ~SceneView();
     SceneView(const SceneView&)=delete;
     SceneView& operator=(const SceneView&)=delete;
     lv_obj_t* root() const { return root_; }
     void SetScene(Scene scene);
+    void SetEmotion(Emotion emotion);
     Scene scene() const { return scene_; }
     void SetTheme(ui::Theme theme);
     void SetTelemetry(const ui::Telemetry& telemetry);
@@ -31,6 +32,7 @@ public:
     void RenderAt(uint32_t elapsed_ms);
     uint32_t elapsed() const { return elapsed_; }
     size_t primitive_count() const { return count_; }
+    size_t raster_storage_bytes() const { return pixels_.size()*sizeof(uint32_t)+depth_.size()*sizeof(float); }
     bool overflowed() const { return overflow_; }
 private:
     struct V { float x,y,z; };
@@ -60,9 +62,10 @@ private:
     std::array<Item,3072> items_{};
     size_t count_=0;
     bool overflow_=false,animated_=true;
-    int width_=0,height_=0;
+    int width_=0,height_=0,render_width_=0,render_height_=0,render_divisor_=1;
     float scale_=1,yaw_=0,pitch_=0,shift_=0,bob_=0,morph_=0,time_=0;
     uint32_t elapsed_=0,last_tick_=0,ink_=ui::kBambuGreen,bg_=0;
+    Emotion emotion_=Emotion::Idle;
     Scene scene_=Scene::Game;
     ui::Theme theme_=ui::Theme::Black;
     ui::Telemetry telemetry_;

@@ -1,4 +1,5 @@
 #include "bambu_display.h"
+#include "scene_policy.h"
 #include "application.h"
 #include "settings.h"
 #include "lvgl_theme.h"
@@ -12,7 +13,7 @@ BambuDisplay::~BambuDisplay() {
     DisplayLockGuard lock(this);
     if (refresh_timer_) lv_timer_delete(refresh_timer_);
     if (message_panel_) lv_obj_delete(message_panel_);
-    face_.reset();
+    scene_.reset();
 }
 
 void BambuDisplay::SetupUI() {
@@ -20,10 +21,11 @@ void BambuDisplay::SetupUI() {
     if (setup_ui_called_) return;
     Display::SetupUI();
     Settings settings("display", false);
-    face_theme_ = settings.GetString("theme", "dark") == "light" ? bambu::ui::Theme::Green : bambu::ui::Theme::Black;
-    current_theme_ = LvglThemeManager::GetInstance().GetTheme(face_theme_ == bambu::ui::Theme::Green ? "light" : "dark");
+    scene_theme_ = settings.GetString("theme", "dark") == "light" ? bambu::ui::Theme::Green : bambu::ui::Theme::Black;
+    current_theme_ = LvglThemeManager::GetInstance().GetTheme(scene_theme_ == bambu::ui::Theme::Green ? "light" : "dark");
     auto screen = lv_display_get_screen_active(display_);
-    face_ = std::make_unique<bambu::ui::FaceView>(screen, width_, height_, width_ == height_);
+    scene_ = std::make_unique<bambu::ui::SceneView>(screen, width_, height_, width_ == height_, 2, 100);
+    ESP_LOGI("BambuDisplay", "3D head UI: %dx%d raster, %dx%d native HUD; 100 ms frame target", width_/2, height_/2, width_, height_);
     // Retain the upstream multilingual font for provisioning, activation and chat.
     message_panel_ = lv_obj_create(screen);
     lv_obj_remove_style_all(message_panel_);
@@ -45,16 +47,16 @@ void BambuDisplay::SetupUI() {
 }
 
 void BambuDisplay::ApplyColors() {
-    if (!face_) return;
-    face_->SetTheme(face_theme_);
-    const auto bg = lv_color_hex(face_theme_ == bambu::ui::Theme::Black ? 0 : bambu::ui::kBambuGreen);
-    const auto ink = lv_color_hex(face_theme_ == bambu::ui::Theme::Black ? bambu::ui::kBambuGreen : 0xFFFFFF);
+    if (!scene_) return;
+    scene_->SetTheme(scene_theme_);
+    const auto bg = lv_color_hex(scene_theme_ == bambu::ui::Theme::Black ? 0 : bambu::ui::kBambuGreen);
+    const auto ink = lv_color_hex(scene_theme_ == bambu::ui::Theme::Black ? bambu::ui::kBambuGreen : 0xFFFFFF);
     lv_obj_set_style_bg_color(message_panel_, bg, 0);
     lv_obj_set_style_text_color(message_label_, ink, 0);
 }
 
 void BambuDisplay::Refresh() {
-    if (!face_) return;
+    if (!scene_) return;
     using bambu::ui::Emotion;
     const auto device = Application::GetInstance().GetDeviceState();
     Emotion emotion = requested_;
@@ -71,8 +73,17 @@ void BambuDisplay::Refresh() {
         else if (*printer_.state.value == "PAUSE") emotion = Emotion::Warning;
         else if (*printer_.state.value == "FAILED") emotion = Emotion::Error;
     }
-    face_->SetEmotion(emotion);
     const uint32_t now = lv_tick_get();
+    if(emotion==Emotion::Idle && active_emotion_!=Emotion::Idle)idle_started_=now;
+    active_emotion_=emotion;
+    const auto printer_state=printer_.state.value.value_or("");
+    const bool printer_visual=emotion==Emotion::Error ? printer_.error.value.value_or(0)!=0||printer_state=="FAILED" :
+        emotion==Emotion::Completed ? printer_state=="FINISH" :
+        emotion==Emotion::Printing ? printer_state=="RUNNING"||printer_state=="PREPARE" :
+        emotion==Emotion::Warning && printer_state=="PAUSE";
+    auto selected=bambu::ui::AutomaticScene(emotion,(now-idle_started_)/12000,printer_visual);
+    if(selected!=active_scene_){active_scene_=selected;scene_->SetScene(selected);if(sleeping_)scene_->RenderAt(2500);}
+    scene_->SetEmotion(emotion);
     if (!notification_.empty() && now - notification_started_ >= notification_duration_) notification_.clear();
     if (!system_chat_ && !chat_.empty() && now - chat_started_ >= 10000) chat_.clear();
     const bool conversation = device == kDeviceStateIdle || device == kDeviceStateListening || device == kDeviceStateSpeaking;
@@ -80,8 +91,7 @@ void BambuDisplay::Refresh() {
     if (message != shown_message_) {
         shown_message_ = message;
         lv_label_set_text(message_label_, message.c_str());
-        // Use the multilingual overlay instead of the Latin-only face message label.
-        face_->SetMessage(message.empty() ? "" : " ");
+        // The multilingual panel overlays the telemetry row while a message is present.
     }
     if (message.empty()) lv_obj_add_flag(message_panel_, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_remove_flag(message_panel_, LV_OBJ_FLAG_HIDDEN);
@@ -111,7 +121,7 @@ void BambuDisplay::ShowNotification(const char* text, int duration_ms) {
 void BambuDisplay::SetTheme(::Theme* theme) {
     if (!theme) return;
     DisplayLockGuard lock(this);
-    face_theme_ = theme->name() == "light" ? bambu::ui::Theme::Green : bambu::ui::Theme::Black;
+    scene_theme_ = theme->name() == "light" ? bambu::ui::Theme::Green : bambu::ui::Theme::Black;
     Display::SetTheme(theme); ApplyColors();
 }
 void BambuDisplay::ToggleBambuTheme() {
@@ -119,21 +129,21 @@ void BambuDisplay::ToggleBambuTheme() {
     ::Theme* theme;
     {
         DisplayLockGuard lock(this);
-        theme = LvglThemeManager::GetInstance().GetTheme(face_theme_ == bambu::ui::Theme::Black ? "light" : "dark");
+        theme = LvglThemeManager::GetInstance().GetTheme(scene_theme_ == bambu::ui::Theme::Black ? "light" : "dark");
     }
     SetTheme(theme);
 }
 void BambuDisplay::SetPowerSaveMode(bool on) {
-    DisplayLockGuard lock(this); sleeping_ = on; if (face_) face_->SetAnimated(!on); Refresh();
+    DisplayLockGuard lock(this); sleeping_ = on; if (scene_) scene_->SetAnimated(!on); Refresh();
 }
 void BambuDisplay::UpdatePrinter(const bambu::Snapshot& snapshot) {
     DisplayLockGuard lock(this);
     printer_ = snapshot;
-    if (!face_) return;
+    if (!scene_) return;
     bambu::ui::Telemetry t;
     t.demo = snapshot.demo; t.connected = snapshot.connected; t.stale = !snapshot.state.value;
     auto value = [](const bambu::Field<double>& field) { return field.value ? static_cast<int>(std::lround(*field.value)) : -1; };
     t.progress = value(snapshot.progress); t.remaining_min = value(snapshot.remaining);
     t.nozzle_c = value(snapshot.nozzle); t.bed_c = value(snapshot.bed);
-    face_->SetTelemetry(t); Refresh();
+    scene_->SetTelemetry(t); Refresh();
 }

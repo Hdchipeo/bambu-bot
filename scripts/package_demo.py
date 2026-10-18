@@ -31,6 +31,8 @@ ESP32-S3, flash 16 MB, octal PSRAM, ST7789 and I2S pinout from config.h.
 This is simulated printer data. Servo outputs are disabled.
 UI: short BOOT toggles chat; hold BOOT toggles black/green vs green/white theme.
 Theme is saved to NVS. The compact LCD intentionally hides the DEMO label.
+Head-only 3D UI renders at 140x120, scaled to 280x240; telemetry icons/text are native resolution.
+The 100 ms animation timer is a target; hardware FPS/audio/MQTT performance is unverified.
 Firmware was compiled; physical hardware has not been verified.
 
 Install esptool 4.x in your Python environment or activate ESP-IDF 5.5.4.

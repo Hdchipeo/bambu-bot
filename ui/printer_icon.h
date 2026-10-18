@@ -3,7 +3,7 @@
 #include <array>
 #include <cmath>
 
-namespace bambu::studio {
+namespace bambu::ui {
 // Original LVGL redraw of the user-supplied framed 3D printer reference.
 // Shared geometry with docs/ui/printer-icon.svg; no raster or watermark assets.
 namespace printer_icon_detail {

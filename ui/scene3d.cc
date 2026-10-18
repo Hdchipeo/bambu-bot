@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace bambu::studio {
+namespace bambu::ui {
 namespace {
 constexpr float pi=3.14159265359f;
 constexpr std::array<SceneInfo,18> info{{
@@ -34,11 +34,13 @@ uint32_t Shade(uint32_t c,float f) {
 }
 }
 const SceneInfo& DescribeScene(Scene s) { auto i=static_cast<size_t>(s);return info[i<info.size()?i:0]; }
-SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round):width_(w),height_(h) {
+SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round,int render_divisor,uint32_t frame_period_ms):width_(w),height_(h) {
  scale_=std::min(w/320.f,h/320.f);round_=round;
- pixels_.resize(w*h);depth_.resize(w*h);
+ render_divisor_=std::clamp(render_divisor,1,2);
+ render_width_=w/render_divisor_;render_height_=h/render_divisor_;
+ pixels_.resize(render_width_*render_height_);depth_.resize(render_width_*render_height_);
  image_.header.magic=LV_IMAGE_HEADER_MAGIC;image_.header.cf=LV_COLOR_FORMAT_ARGB8888;
- image_.header.w=w;image_.header.h=h;image_.header.stride=w*4;
+ image_.header.w=render_width_;image_.header.h=render_height_;image_.header.stride=render_width_*4;
  image_.data_size=pixels_.size()*4;image_.data=reinterpret_cast<const uint8_t*>(pixels_.data());
  root_=lv_obj_create(parent);lv_obj_remove_style_all(root_);lv_obj_set_size(root_,w,h);
  lv_obj_set_style_radius(root_,round?LV_RADIUS_CIRCLE:0,0);lv_obj_set_style_clip_corner(root_,true,0);
@@ -56,10 +58,11 @@ SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round):width_(w),height_(
  last_tick_=lv_tick_get();SetTheme(ui::Theme::Black);RenderAt(0);
  timer_=lv_timer_create([](lv_timer_t* t){auto self=static_cast<SceneView*>(lv_timer_get_user_data(t));
   auto now=lv_tick_get();auto dt=now-self->last_tick_;self->last_tick_=now;self->RenderAt(self->elapsed_+dt);
- },33,this);
+ },std::max<uint32_t>(33,frame_period_ms),this);
 }
 SceneView::~SceneView(){if(timer_)lv_timer_delete(timer_);lv_image_cache_drop(&image_);printer_icon_.reset();lv_obj_delete(root_);}
 void SceneView::SetScene(Scene scene){scene_=static_cast<size_t>(scene)>=info.size()?Scene::Game:scene;Restart();}
+void SceneView::SetEmotion(Emotion emotion){if(emotion_==emotion)return;emotion_=emotion;RenderAt(elapsed_);}
 void SceneView::SetTheme(ui::Theme theme){theme_=theme;ink_=theme==ui::Theme::Black?ui::kBambuGreen:0xFFFFFF;bg_=theme==ui::Theme::Black?0:ui::kBambuGreen;
  lv_obj_set_style_bg_color(root_,lv_color_hex(bg_),0);for(auto l:{title_,footer_})lv_obj_set_style_text_color(l,lv_color_hex(ink_),0);
  printer_icon_->SetColor(ink_);
@@ -72,10 +75,10 @@ void SceneView::SetTelemetry(const ui::Telemetry& telemetry){telemetry_=telemetr
 void SceneView::SetAnimated(bool animated){animated_=animated;last_tick_=lv_tick_get();if(timer_){if(animated)lv_timer_resume(timer_);else lv_timer_pause(timer_);}}
 void SceneView::Restart(){last_tick_=lv_tick_get();RenderAt(0);}
 void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;Build();
- lv_label_set_text(title_,elapsed<1200?"BAMBU BOT / 2D > 3D":DescribeScene(scene_).name);
+ lv_label_set_text(title_,emotion_!=Emotion::Idle?Describe(emotion_).name:elapsed<1200?"BAMBU BOT / 2D > 3D":DescribeScene(scene_).name);
  char text[96];
- if(scene_==Scene::Error)std::snprintf(text,sizeof(text),"DEMO / Printer needs attention");
- else if(scene_==Scene::Complete)std::snprintf(text,sizeof(text),"DEMO / Your print is ready!");
+ if(scene_==Scene::Error)std::snprintf(text,sizeof(text),"%sPrinter needs attention",telemetry_.demo?"DEMO / ":"");
+ else if(scene_==Scene::Complete)std::snprintf(text,sizeof(text),"%sYour print is ready!",telemetry_.demo?"DEMO / ":"");
  else if(!telemetry_.connected||telemetry_.stale)std::snprintf(text,sizeof(text),"Printer data unavailable");
  else text[0]=0;
  lv_label_set_text(footer_,text);
@@ -167,17 +170,26 @@ void SceneView::Head(float m,float time){
  Triangle(Transform({0,cy,-depth/2-1}),inner[i],inner[j],theme_==ui::Theme::Black?0x001B0B:0x006D2A,1,false);}
  auto line=[&](V a,V b,float width=4){Segment(Transform(a),Transform(b),width,ink_);};
  float z=-depth/2-2,eye_y=cy-2;
- if(scene_==Scene::Nap){line({-37,eye_y,z},{-20,eye_y+2,z});line({22,eye_y,z},{38,eye_y+2,z});}
- else if(scene_==Scene::Error){for(float x:{-29.f,29.f}){line({x-7,eye_y-7,z},{x+7,eye_y+7,z});line({x-7,eye_y+7,z},{x+7,eye_y-7,z});}}
- else if(scene_==Scene::Complete||scene_==Scene::Wave){for(float x:{-29.f,29.f}){line({x-8,eye_y+3,z},{x,eye_y-5,z});line({x,eye_y-5,z},{x+8,eye_y+3,z});}}
+ if(scene_==Scene::Nap||emotion_==Emotion::Sleepy){line({-37,eye_y,z},{-20,eye_y+2,z});line({22,eye_y,z},{38,eye_y+2,z});}
+ else if(scene_==Scene::Error||emotion_==Emotion::Error){for(float x:{-29.f,29.f}){line({x-7,eye_y-7,z},{x+7,eye_y+7,z});line({x-7,eye_y+7,z},{x+7,eye_y-7,z});}}
+ else if(scene_==Scene::Complete||scene_==Scene::Wave||emotion_==Emotion::Happy||emotion_==Emotion::Completed){for(float x:{-29.f,29.f}){line({x-8,eye_y+3,z},{x,eye_y-5,z});line({x,eye_y-5,z},{x+8,eye_y+3,z});}}
+ else if(emotion_==Emotion::Offline){line({-38,eye_y,z},{-21,eye_y,z});line({21,eye_y,z},{38,eye_y,z});}
+ else if(emotion_==Emotion::Listening||emotion_==Emotion::Warning){line({-29,eye_y-12,z},{-29,eye_y+12,z});line({29,eye_y-12,z},{29,eye_y+12,z});}
+ else if(emotion_==Emotion::Sad){line({-38,eye_y-4,z},{-21,eye_y+3,z});line({21,eye_y+3,z},{38,eye_y-4,z});}
+ else if(emotion_==Emotion::Curious){line({-29,eye_y-5,z},{-29,eye_y+5,z});line({29,eye_y-14,z},{29,eye_y+12,z});}
+ else if(emotion_==Emotion::Confused){line({-38,eye_y-4,z},{-21,eye_y+4,z});line({29,eye_y-10,z},{29,eye_y+7,z});}
+ else if(emotion_==Emotion::Thinking){for(float x:{-29.f,29.f})line({x-8,eye_y,z},{x+8,eye_y,z});}
  else {line({-34,eye_y-8,z},{-25,eye_y,z});line({-25,eye_y,z},{-34,eye_y+8,z});line({29,eye_y-9,z},{29,eye_y+9,z});}
  if(scene_==Scene::Chill){RobotBox({-29,eye_y,-depth/2-4},{29,16,3},0x17251F,m);RobotBox({29,eye_y,-depth/2-4},{29,16,3},0x17251F,m);line({-15,eye_y,z-4},{15,eye_y,z-4},2);line({-38,eye_y-4,z-6},{-30,eye_y-4,z-6},1);line({20,eye_y-4,z-6},{28,eye_y-4,z-6},1);}
- line({-13,cy+24,z},{13,cy+24,z},3);
+ if(emotion_==Emotion::Speaking){for(int i=0;i<5;++i){float x=-20+i*10,h=3+std::abs(std::sin(time*8+i))*8;line({x,cy+24-h,z},{x,cy+24+h,z},3);}}
+ else if(emotion_==Emotion::Sad){line({-13,cy+27,z},{0,cy+21,z},3);line({0,cy+21,z},{13,cy+27,z},3);}
+ else line({-13,cy+24,z},{13,cy+24,z},3);
+ if(emotion_==Emotion::Thinking)for(int i=0;i<3;++i)Disc(Transform({-10.f+i*10,cy-28,-depth/2-3}),2,2,ink_,.4f+.6f*std::abs(std::sin(time*3+i)));
  RobotBox({-hw-4,cy,0},{8,27,depth*.8f},ink_);RobotBox({hw+4,cy,0},{8,27,depth*.8f},ink_);
  line({-hw+18,cy-hh,z+3},{-hw+18,cy-hh-15,z+3},7);
  // A moving highlight makes the bevel and perspective legible.
  Segment(front[7],front[10],1.3f,theme_==ui::Theme::Black?0xA0FFD0:0xFFFFFF,m*.65f);
- (void)time;
+
 }
 void SceneView::Build(){
  count_=0;overflow_=false;float t=elapsed_/1000.f;float u=std::clamp(t/1.2f,0.f,1.f);morph_=u*u*(3-2*u);time_=std::max(0.f,t-1.2f);
@@ -195,7 +207,8 @@ void SceneView::Build(){
  Head(m,time_);
  auto line=[&](V a,V b,float w=2,uint32_t c=0){Segment(a,b,w,c?c:ink_,m);};
  auto star=[&](float x,float y,float z,float r){for(int i=0;i<4;++i){float a=i*pi/2;line({x+std::cos(a)*r,y+std::sin(a)*r,z},{x,y,z},2);}};
- switch(scene_){
+ const bool props=emotion_==Emotion::Idle||(emotion_==Emotion::Printing&&scene_==Scene::Printer)||(emotion_==Emotion::Completed&&scene_==Scene::Complete)||(emotion_==Emotion::Error&&scene_==Scene::Error)||(emotion_==Emotion::Warning&&scene_==Scene::Printer)||(emotion_==Emotion::Sleepy&&scene_==Scene::Nap);
+ if(props)switch(scene_){
  case Scene::Game:
   Box({0,58,-80},{82,26,24},ink_,m);line({-27,53,-94},{-27,65,-94},3,0x003A16);line({-33,59,-94},{-21,59,-94},3,0x003A16);
   Disc({24,55+beat,-94},3,3,0x003A16,m);Disc({32,62-beat,-94},3,3,0x003A16,m);star(95,-45+beat*3,0,9);break;
@@ -210,7 +223,7 @@ void SceneView::Build(){
  case Scene::Fly:{float x=std::sin(time_*1.7f)*107,y=-57+std::sin(time_*3.4f)*40;Disc({x,y,-100},5,3,0xA9C8B5,m);Disc({x-3,y-5,-99},5,2+std::abs(beat)*3,0xDDFEEA,m*.6f);Disc({x+4,y-5,-99},5,3,0xDDFEEA,m*.6f);for(int i=1;i<5;++i)Disc({x-i*8,y+std::sin(time_*3-i)*6,-99},1,1,ink_,m*.3f);break;}
  case Scene::Printer:case Scene::Complete:case Scene::Error:{
   float x=scene_==Scene::Complete?92:85;Box({x,80,-65},{62,8,42},ink_,m);Box({x-28,37,-50},{5,82,5},ink_,m);Box({x+28,37,-50},{5,82,5},ink_,m);Box({x,-3,-50},{61,6,8},ink_,m);
-  float nx=x+(scene_==Scene::Error?0:std::sin(time_*2)*17);Box({nx,20,-60},{12,16,12},ink_,m);Box({x,66,-66},{20,18+8*(s+1),20},ui::kBambuGreen,m);
+  float nx=x+(scene_==Scene::Error||emotion_==Emotion::Warning?0:std::sin(time_*2)*17);Box({nx,20,-60},{12,16,12},ink_,m);Box({x,66,-66},{20,emotion_==Emotion::Warning?20.f:18+8*(s+1),20},ui::kBambuGreen,m);
   if(scene_==Scene::Error){Triangle({x-15,-25,-75},{x+15,-25,-75},{x,-52,-75},0xF47668,m,false);line({x,-45,-76},{x,-35,-76},2,0x000000);Disc({x,-30,-76},1.5,1.5,0,m);}
   if(scene_==Scene::Complete){line({-22,-83,-80},{-12,-73,-80},4);line({-12,-73,-80},{9,-94,-80},4);for(int i=0;i<16;++i){float cx=-106+(i*37%213),cy=-100+std::fmod(time_*35+i*19,185.f);Box({cx,cy,-110},{3,6,2},i%2?ink_:0xA9F48C,m);}}
   break;}
@@ -218,9 +231,11 @@ void SceneView::Build(){
   Box({0,74,-65},{146,28,67},ink_,m);Box({0,52,-42},{80,18,40},ink_,m);for(float x:{-61.f,61.f}){Disc({x,89,-104},15,15,0x17251F,m);Disc({x,89,-105},6,6,ink_,m);line({x,89,-106},{x+10*std::sin(time_*8),89+10*std::cos(time_*8),-106},2);}
   for(int i=0;i<5;++i){float y=30+i*18;float x=-115+std::fmod(time_*85+i*24,32.f);line({x,y,10},{x-17,y,10},1);}break;
  case Scene::Chill:
-  for(int i=0;i<3;++i)Disc({75+i*10+std::sin(time_*.5f)*10,-93,15},13,7,ink_,m*.5f);Disc({-95,-82,10},13,13,ink_,m*.5f);break;
+  for(int i=0;i<3;++i){Disc({75+i*10+std::sin(time_*.5f)*10,-93,15},13,7,ink_,m*.5f);}
+  Disc({-95,-82,10},13,13,ink_,m*.5f);break;
  case Scene::Dance:
-  for(int i=0;i<6;++i)Box({-70.f+i%3*47,107,10.f+i/3*30},{42,2,24},ink_,m*(.2f+.3f*(1+std::sin(time_*5+i))));star(94,-75,0,10+beat*3);break;
+  for(int i=0;i<6;++i){Box({-70.f+i%3*47,107,10.f+i/3*30},{42,2,24},ink_,m*(.2f+.3f*(1+std::sin(time_*5+i))));}
+  star(94,-75,0,10+beat*3);break;
  case Scene::Plant:
   Box({83,80,-65},{29,29,28},ink_,m);line({83,66,-68},{83,24,-68},3);Disc({73,38,-70},12,5,ink_,m);Disc({94,29,-70},12,5,ink_,m);Box({38,30,-75},{24,18,22},ink_,m);line({50,28,-75},{66,42,-75},4);for(int j=0;j<3;++j)Disc({64.f+j*3,42+std::fmod(time_*30+j*8,28.f),-77},1.5,3,ink_,m);break;
  case Scene::PaperPlane:{float x=std::sin(time_*1.3f)*105,y=-63+std::cos(time_*1.3f)*18;Triangle({x-15,y+9,-95},{x+22,y,-95},{x-8,y-9,-85},ink_,m);Triangle({x-8,y-9,-85},{x+22,y,-95},{x-2,y+3,-105},Shade(ink_,.6f),m);break;}
@@ -237,21 +252,21 @@ void SceneView::Draw(lv_layer_t* layer){
  // Reused buffers; visibility comes from per-pixel inverse-depth, including face decals.
  std::fill(pixels_.begin(),pixels_.end(),bg_|0xFF000000);std::fill(depth_.begin(),depth_.end(),0.f);
  struct P {float x,y,iz;};
- auto project=[&](V p){float iz=1.f/(520.f+p.z);return P{width_/2.f+p.x*520*iz*scale_,height_/2.f+p.y*520*iz*scale_,iz};};
+ auto project=[&](V p){float iz=1.f/(520.f+p.z);return P{(width_/2.f+p.x*520*iz*scale_)/render_divisor_,(height_/2.f+p.y*520*iz*scale_)/render_divisor_,iz};};
  auto pixel=[&](int x,int y,float z,const Item& item,float coverage=1.f){
-  auto index=static_cast<size_t>(y*width_+x);if(z+1e-8f<depth_[index])return;
+  auto index=static_cast<size_t>(y*render_width_+x);if(z+1e-8f<depth_[index])return;
   const uint32_t alpha=static_cast<uint32_t>(item.opacity*std::clamp(coverage,0.f,1.f));if(alpha==0)return;
   auto previous=pixels_[index];auto mix=[&](int shift){return ((((item.color>>shift)&255)*alpha+((previous>>shift)&255)*(255-alpha))/255)<<shift;};
   pixels_[index]=0xFF000000|mix(16)|mix(8)|mix(0);depth_[index]=z;
  };
  for(size_t i=0;i<count_;++i){const auto& item=items_[i];if(!item.opacity)continue;
   auto a=project(item.p[0]),b=project(item.p[1]),c=project(item.p[2]);
-  float pad=item.line?std::max(.6f,item.width*scale_/2)+1:0;
-  int x0=std::clamp(static_cast<int>(std::floor(std::min({a.x,b.x,c.x})-pad)),0,width_-1);
-  int x1=std::clamp(static_cast<int>(std::ceil(std::max({a.x,b.x,c.x})+pad)),0,width_-1);
-  int y0=std::clamp(static_cast<int>(std::floor(std::min({a.y,b.y,c.y})-pad)),0,height_-1);
-  int y1=std::clamp(static_cast<int>(std::ceil(std::max({a.y,b.y,c.y})+pad)),0,height_-1);
-  if(item.line){float dx=b.x-a.x,dy=b.y-a.y,length=dx*dx+dy*dy,r=std::max(.6f,item.width*scale_/2);
+  float pad=item.line?std::max(.6f,item.width*scale_/(2*render_divisor_))+1:0;
+  int x0=std::clamp(static_cast<int>(std::floor(std::min({a.x,b.x,c.x})-pad)),0,render_width_-1);
+  int x1=std::clamp(static_cast<int>(std::ceil(std::max({a.x,b.x,c.x})+pad)),0,render_width_-1);
+  int y0=std::clamp(static_cast<int>(std::floor(std::min({a.y,b.y,c.y})-pad)),0,render_height_-1);
+  int y1=std::clamp(static_cast<int>(std::ceil(std::max({a.y,b.y,c.y})+pad)),0,render_height_-1);
+  if(item.line){float dx=b.x-a.x,dy=b.y-a.y,length=dx*dx+dy*dy,r=std::max(.6f,item.width*scale_/(2*render_divisor_));
    for(int y=y0;y<=y1;++y)for(int x=x0;x<=x1;++x){float t=length>0?std::clamp(((x+.5f-a.x)*dx+(y+.5f-a.y)*dy)/length,0.f,1.f):0;
     float ex=x+.5f-a.x-dx*t,ey=y+.5f-a.y-dy*t,d=std::sqrt(ex*ex+ey*ey);if(d<=r+.5f)pixel(x,y,a.iz+(b.iz-a.iz)*t,item,r+.5f-d);}
   }else{float den=(b.y-c.y)*(a.x-c.x)+(c.x-b.x)*(a.y-c.y);if(std::abs(den)<.01f)continue;
@@ -260,9 +275,10 @@ void SceneView::Draw(lv_layer_t* layer){
     if(u>=-.0001f&&v>=-.0001f&&w>=-.0001f)pixel(x,y,u*a.iz+v*b.iz+w*c.iz,item);}
   }
  }
- if(round_)for(int y=0;y<height_;++y)for(int x=0;x<width_;++x){float dx=x+.5f-width_/2.f,dy=y+.5f-height_/2.f;
-  if(dx*dx+dy*dy>width_*width_/4.f)pixels_[y*width_+x]=0;}
+ if(round_)for(int y=0;y<render_height_;++y)for(int x=0;x<render_width_;++x){float dx=x+.5f-render_width_/2.f,dy=y+.5f-render_height_/2.f;
+  if(dx*dx+dy*dy>render_width_*render_width_/4.f)pixels_[y*render_width_+x]=0;}
  lv_area_t area;lv_obj_get_coords(root_,&area);
- lv_draw_image_dsc_t d;lv_draw_image_dsc_init(&d);d.src=&image_;lv_draw_image(layer,&d,&area);
+ lv_draw_image_dsc_t d;lv_draw_image_dsc_init(&d);d.src=&image_;d.scale_x=d.scale_y=256*render_divisor_;d.pivot={0,0};
+ area.x2=area.x1+render_width_-1;area.y2=area.y1+render_height_-1;lv_draw_image(layer,&d,&area);
 }
 }

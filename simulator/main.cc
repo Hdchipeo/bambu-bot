@@ -1,5 +1,6 @@
 #include "bambu_face.h"
 #include "scene3d.h"
+#include "scene_policy.h"
 #include <SDL.h>
 #include <algorithm>
 #include <array>
@@ -18,9 +19,9 @@ using bambu::ui::FaceView;
 using bambu::ui::Telemetry;
 using bambu::ui::kBambuGreen;
 using bambu::ui::Theme;
-using bambu::studio::Scene;
-using bambu::studio::SceneView;
-using bambu::studio::DescribeScene;
+using bambu::ui::Scene;
+using bambu::ui::SceneView;
+using bambu::ui::DescribeScene;
 namespace fs = std::filesystem;
 static_assert(LVGL_VERSION_MAJOR==9 && LVGL_VERSION_MINOR==5 && LVGL_VERSION_PATCH==0,
               "Bambu Bot Studio is tested with LVGL 9.5.0");
@@ -522,7 +523,27 @@ void SelfTest(Canvas& canvas) {
     const auto preserved_time=studio.scene().elapsed();studio.SetRound(!studio.round());
     Require(studio.scene().elapsed()==preserved_time,"Display switch reset scene time");
     FastClick(canvas,studio.mode_button());Require(!studio.mode3d(),"Return to 2D failed");
-    std::cout<<"PASS: 18 3D scenes, replay, 2 themes, 2 displays, bounded mesh pools; fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, both themes on both displays, compact layout without DEMO, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
+    {
+        // Exercise the exact half-resolution profile used by firmware, including scaling to LCD.
+        SceneView embedded(lv_screen_active(),280,240,false,2,100);embedded.SetAnimated(false);embedded.SetTheme(Theme::Green);
+        Require(embedded.raster_storage_bytes()==134400,"Firmware raster budget changed");
+        Telemetry live;live.demo=false;live.progress=42;live.nozzle_c=220;live.bed_c=60;embedded.SetTelemetry(live);
+        for(int i=0;i<kScenes;++i){embedded.SetScene(static_cast<Scene>(i));embedded.RenderAt(2500);canvas.Frame(ticks+100);
+            Require(!embedded.overflowed(),"Firmware profile geometry overflow");}
+        Require(AllText(embedded.root()).find("DEMO")==std::string::npos,"Live renderer uses demo label");
+        for(int i=0;i<kCount;++i){auto emotion=static_cast<Emotion>(i);embedded.SetScene(bambu::ui::AutomaticScene(emotion,0));embedded.SetEmotion(emotion);
+            embedded.RenderAt(2500);canvas.Frame(ticks+100);Require(!embedded.overflowed(),"Firmware emotion geometry overflow");}
+        embedded.SetEmotion(Emotion::Idle);embedded.SetScene(Scene::Coffee);embedded.RenderAt(2500);canvas.Frame(ticks+100);
+        Require((canvas.pixels[120*kWidth+140]&0xFFFFFF)!=bambu::ui::kBambuGreen,"Half-resolution head was not scaled into LCD center");
+        for(uint32_t i=0;i<45;++i){auto idle=bambu::ui::AutomaticScene(Emotion::Idle,i);
+            Require(idle!=Scene::Printer&&idle!=Scene::Complete&&idle!=Scene::Error,"Idle rotation invents printer events");}
+        Require(bambu::ui::AutomaticScene(Emotion::Error,9)==Scene::Game,"Assistant emotion invents printer error");
+        Require(bambu::ui::AutomaticScene(Emotion::Completed,9)==Scene::Game,"Assistant emotion invents completion");
+        Require(bambu::ui::AutomaticScene(Emotion::Printing,9,true)==Scene::Printer,"Printing scene mapping failed");
+        Require(bambu::ui::AutomaticScene(Emotion::Completed,9,true)==Scene::Complete,"Completion scene mapping failed");
+        Require(bambu::ui::AutomaticScene(Emotion::Error,9,true)==Scene::Error,"Error scene mapping failed");
+    }
+    std::cout<<"PASS: firmware 140x120 raster, scaling, real/demo labels, scene priorities and conversation emotions; 18 3D scenes, replay, 2 themes, 2 displays, bounded mesh pools; fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, both themes on both displays, compact layout without DEMO, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
 }
 
 void Export(Canvas& canvas,const fs::path& output) {
@@ -565,8 +586,15 @@ void Export(Canvas& canvas,const fs::path& output) {
         }
     }
     {
+        SceneView embedded(lv_screen_active(),280,240,false,2,100);embedded.SetAnimated(false);
+        Telemetry demo;demo.progress=42;demo.nozzle_c=220;demo.bed_c=60;embedded.SetTelemetry(demo);
+        embedded.SetScene(Scene::Printer);embedded.SetEmotion(Emotion::Printing);embedded.RenderAt(3200);canvas.Frame(ticks+100);
+        canvas.SaveLcd(embedded.root(),output/"firmware-3d-black.bmp");
+        embedded.SetTheme(Theme::Green);canvas.Frame(ticks+100);canvas.SaveLcd(embedded.root(),output/"firmware-3d-green.bmp");
+    }
+    {
         auto card=Box(lv_screen_active(),0,0,220,232,0xFFFFFF,0);
-        {bambu::studio::PrinterIconView icon(card,180,0x000000,2);
+        {bambu::ui::PrinterIconView icon(card,180,0x000000,2);
          lv_obj_set_pos(icon.root(),20,20);canvas.Frame(ticks+1);canvas.SaveLcd(card,output/"printer-icon.bmp");}
         lv_obj_delete(card);
     }
