@@ -507,6 +507,14 @@ void SelfTest(Canvas& canvas) {
             studio.Replay();Require(studio.scene().elapsed()==0,"2D to 3D replay failed");
         }
     }
+    studio.SelectScene(1);
+    Telemetry hud;hud.progress=42;hud.nozzle_c=220;hud.bed_c=60;studio.scene().SetTelemetry(hud);
+    auto hud_text=AllText(studio.scene().root());
+    Require(hud_text.find("42%")!=std::string::npos&&hud_text.find("220 °C")!=std::string::npos&&hud_text.find("60 °C")!=std::string::npos,"3D telemetry HUD values missing");
+    hud.stale=true;studio.scene().SetTelemetry(hud);hud_text=AllText(studio.scene().root());
+    Require(hud_text.find("220")==std::string::npos&&hud_text.find("-- °C")!=std::string::npos,"3D stale temperature leaked");
+    hud.stale=false;hud.connected=false;studio.scene().SetTelemetry(hud);
+    Require(AllText(studio.scene().root()).find("42%")==std::string::npos,"3D disconnected progress leaked");
     studio.scene().SetAnimated(false);studio.scene().RenderAt(2500);canvas.Frame(ticks+1000);
     Require(studio.scene().elapsed()==2500,"Paused scene advanced");
     studio.scene().SetAnimated(true);canvas.Frame(ticks+1000);studio.scene().SetAnimated(false);

@@ -1,6 +1,6 @@
 # Bambu Bot — 3D idle stories
 
-Bản thử nghiệm **Emotion Studio 0.3.1**, triển khai trước trên simulator macOS. Bấm **3D scenes** hoặc **D** để chuyển từ bộ 14 emotion 2D sang bộ 18 hoạt cảnh 3D. Chọn một cảnh để chạy phần mở đầu: mặt phẳng dần có độ dày, đầu robot lớn hơn được đặt giữa màn hình và đạo cụ xuất hiện trong **1,2 giây**, sau đó bot bắt đầu hoạt động.
+Bản thử nghiệm **Emotion Studio 0.3.2**, triển khai trước trên simulator macOS. Bấm **3D scenes** hoặc **D** để chuyển từ bộ 14 emotion 2D sang bộ 18 hoạt cảnh 3D. Chọn một cảnh để chạy phần mở đầu: mặt phẳng dần có độ dày, đầu robot lớn hơn được đặt giữa màn hình và đạo cụ xuất hiện trong **1,2 giây**, sau đó bot bắt đầu hoạt động.
 
 Từ **0.3.1**, robot chỉ có **phần đầu**; đã bỏ toàn bộ thân, tay, bàn tay, chân và bàn chân. Đầu được phóng lớn, đặt lại gần giữa màn hình; đạo cụ vẫn chuyển động độc lập quanh đầu.
 
@@ -26,6 +26,12 @@ Từ **0.3.1**, robot chỉ có **phần đầu**; đã bỏ toàn bộ thân, t
 | Phím trái/phải | Cảnh trước/sau trong bộ đang mở |
 
 Phần nền và nét chính dùng Bambu Green `#00AE42`, đen hoặc trắng theo theme; mô hình 3D thêm các mức sáng/tối để thấy bề dày và hướng mặt. Dấu cảnh báo đỏ dùng riêng trong cảnh lỗi. Các cảnh âm nhạc/game/xe chỉ minh họa bằng hình, chưa có âm thanh.
+
+## Dòng thông số LCD — 0.3.2
+
+Ba nhóm icon/số cố định dưới hoạt cảnh: **bản in → tiến độ %**, **đầu phun → °C**, **bàn nhiệt → °C**, cùng thanh tiến độ mảnh bên dưới. Kích thước và khoảng cách được căn riêng cho 466×466 và 280×240. Các nét theo màu theme xanh Bambu hoặc trắng.
+
+Các outline LVGL được vẽ độc lập theo hình thái trong Bambu Studio: [monitor_item_print](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_item_print.svg), [monitor_nozzle_temp](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_nozzle_temp.svg), [monitor_bed_temp](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_bed_temp.svg). Không nhập SVG/mã nguồn của Studio. Thiếu từng giá trị dùng `--`; offline/stale xóa số đo hiện tại và đưa thanh tiến độ về rỗng. Cảnh Complete/Error có dòng chú thích DEMO dưới tên cảnh, giữ vùng icon/số ở đáy màn hình.
 
 ## Kịch bản
 
@@ -60,10 +66,10 @@ Cảnh hoàn tất và lỗi được chọn bằng tay trong simulator; chưa p
 
 Bản 3D dùng hai buffer màu/độ sâu cùng kích thước LCD: khoảng 1,66 MiB ở 466×466 hoặc 525 KiB ở 280×240, cộng bộ nhớ hình học, LVGL và SDL. Vì vậy chưa thể coi đây là ngân sách RAM/FPS đã đạt trên ESP32; bước tiếp theo cần đo trên thiết bị, giảm độ phân giải render hoặc rút gọn mô hình. Shader ánh sáng đơn giản, không có phản xạ vật lý; kính lúp/ly chỉ minh họa, không khúc xạ thật.
 
-Renderer ở `simulator/scene3d.h` và `simulator/scene3d.cc`. Chỉ biên dịch cùng target simulator; không sửa pin, LCD driver hoặc luồng dữ liệu firmware. Pool hình học cố định 3.072 primitive, buffer được cấp phát khi tạo view và tái sử dụng qua các frame. Phần hiển thị 3D có hai label LVGL cố định, không tạo/xóa widget theo frame.
+Renderer ở `simulator/scene3d.h` và `simulator/scene3d.cc`. Chỉ biên dịch cùng target simulator; không sửa pin, LCD driver hoặc luồng dữ liệu firmware. Pool hình học cố định 3.072 primitive, buffer được cấp phát khi tạo view và tái sử dụng qua các frame. Các label, icon và thanh tiến độ LVGL được tạo một lần, không tạo/xóa widget theo frame.
 
 ## Kiểm tra và xuất ảnh
 
-Chạy build/CTest như [UI_STUDIO.md](UI_STUDIO.md). Smoke test đi qua click SDL/LVGL của mode 3D và cả 18 nút cảnh, hai theme và hai màn hình; kiểm tra các mốc 0 / 600 / 1.200 / 2.500 / 5.000 / 9.000 / 17.000 ms, không tràn pool hình học, không tăng số widget và có thể trở lại 2D. Kiểm tra tạm dừng/tiếp tục và giữ thời điểm khi đổi display. Bài kiểm tra cũ của emotion, input, thông báo, offline/stale vẫn chạy.
+Chạy build/CTest như [UI_STUDIO.md](UI_STUDIO.md). Smoke test đi qua click SDL/LVGL của mode 3D và cả 18 nút cảnh, hai theme và hai màn hình; kiểm tra các mốc 0 / 600 / 1.200 / 2.500 / 5.000 / 9.000 / 17.000 ms, không tràn pool hình học, không tăng số widget và có thể trở lại 2D. Kiểm tra tạm dừng/tiếp tục và giữ thời điểm khi đổi display. Bản 0.3.2 kiểm tra thêm đơn vị và giá trị dòng thông số 3D, ẩn số cũ khi stale/disconnected. Bài kiểm tra cũ của emotion, input, thông báo, offline/stale vẫn chạy.
 
 Lệnh `--headless --output dist/ui-preview` xuất thêm 72 ảnh cảnh LCD (`scene-<index>-<display>-<theme>.bmp`), ảnh `studio-3d.bmp` và 80 frame của cảnh cà phê trong thư mục `animation/`. GIF trong tài liệu được ghép từ các frame render đó; không phải tài sản dùng để chạy UI.

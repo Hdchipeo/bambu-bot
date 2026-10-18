@@ -43,7 +43,12 @@ private:
     void Head(float morph,float time);
     void Build();
     void Draw(lv_layer_t* layer);
+    void CreateTelemetryHud();
+    void UpdateTelemetryHud();
     lv_obj_t *root_=nullptr,*title_=nullptr,*footer_=nullptr;
+    lv_obj_t *hud_=nullptr,*progress_bar_=nullptr;
+    std::array<lv_obj_t*,3> values_{};
+    std::array<std::array<lv_point_precise_t,10>,12> hud_points_{};
     lv_timer_t* timer_=nullptr;
     lv_image_dsc_t image_{};
     std::vector<uint32_t> pixels_;
