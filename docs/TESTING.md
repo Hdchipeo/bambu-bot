@@ -43,6 +43,12 @@ Không khẳng định đã tra Bambu Wiki vì bản firmware thử này chưa c
 
 Prompt này là hướng dẫn cấu hình, không tự thay đổi server hoặc bảo đảm model luôn tuân thủ.
 
+## Log xác nhận LAN
+
+Khi dùng cấu hình `demo=false`, log lần kết nối thành công có `Printer LAN MQTT connected`, sau đó `Live printer telemetry ready` kèm tiến độ/nhiệt độ. Log không ghi access code, serial hoặc payload máy in. Thông báo disconnected cho biết cần chờ reconnect; không coi dữ liệu cũ là dữ liệu mới.
+
+IP được lưu trong Bambu Studio có thể đã cũ sau khi DHCP đổi địa chỉ. Khi timeout, đối chiếu quảng bá LAN theo đúng serial hoặc kết nối LAN đang hoạt động của Studio trước khi kết luận MQTT bị tắt.
+
 ## Thử với A1
 
 1. Bật đường truy cập LAN được firmware A1 hỗ trợ, đặt IP cố định hoặc DHCP reservation và lấy serial/access code.
@@ -68,5 +74,6 @@ Chỉ xử lý `print_error` và nhóm trường cơ bản; chưa giải mã đ�
 - Build ESP-IDF 5.5.4 đạt: firmware 3D v0.3.0, app `0x2b9990` byte, còn `0x136670` byte (31%) trong phân vùng ứng dụng.
 - Định nghĩa phần cứng khớp từng byte với `config.h` nguồn; SHA-256 ghi trong UPSTREAM.md.
 - SDK cài trên máy báo `v5.5.4-dirty`; đây là kết quả build trên môi trường hiện có, chưa phải xác nhận build trên SDK sạch hoặc kết quả CI GitHub.
-- Chưa xác nhận nạp/chạy trên Desk-bot, chưa thử MQTT với A1 thật.
+- Đã nạp bản LAN riêng lên Desk-bot ESP32-S3 (8 MB PSRAM, 16 MB flash). Log USB xác nhận Wi-Fi có IP, MQTT kết nối và nhận telemetry A1 thật; kiểm tra từ Mac cũng đạt TLS bằng CA chính thức và MQTT authentication. Cấu hình cá nhân/header chứa credential bị Git bỏ qua, không phát hành binary LAN riêng.
+- Chưa xác nhận trực quan toàn bộ màn LCD hoặc chạy dài; chưa đo FPS/RAM tổng khi thoại và MQTT cùng hoạt động.
 - Chưa xác nhận ASR/TTS tiếng Việt, chất lượng microphone/loa, độ ổn định chạy dài hoặc mức tiêu thụ bộ nhớ khi có thoại và MQTT đồng thời.

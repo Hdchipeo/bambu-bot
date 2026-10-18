@@ -28,6 +28,7 @@ esp_mqtt_client_handle_t client = nullptr;
 std::string report_topic, request_topic, incoming;
 int incoming_total = 0;
 std::atomic<bool> mqtt_connected{false};
+bool telemetry_confirmed = false; // Accessed only by the MQTT event task.
 int64_t Now() { return esp_timer_get_time() / 1000; }
 
 void OnMqtt(void*, esp_event_base_t, int32_t id, void* data) {
@@ -35,6 +36,8 @@ void OnMqtt(void*, esp_event_base_t, int32_t id, void* data) {
     switch (id) {
         case MQTT_EVENT_CONNECTED:
             mqtt_connected = true;
+            telemetry_confirmed = false;
+            ESP_LOGI(kTag, "Printer LAN MQTT connected");
             state.SetConnection(true);
             state.SetDemo(false);
             incoming.clear();
@@ -48,6 +51,8 @@ void OnMqtt(void*, esp_event_base_t, int32_t id, void* data) {
             break;
         case MQTT_EVENT_DISCONNECTED:
             mqtt_connected = false;
+            telemetry_confirmed = false;
+            ESP_LOGW(kTag, "Printer LAN MQTT disconnected");
             state.SetConnection(false);
             state.SetDemo(false);
             incoming.clear();
@@ -72,6 +77,17 @@ void OnMqtt(void*, esp_event_base_t, int32_t id, void* data) {
             incoming.append(event->data, event->data_len);
             if (static_cast<int>(incoming.size()) == incoming_total) {
                 state.Apply(incoming, Now());
+                if (!telemetry_confirmed) {
+                    const auto fresh = state.GetFreshSnapshot(Now());
+                    if (fresh.state.value) {
+                        const auto number = [](const Field<double>& field) {
+                            return field.value ? static_cast<int>(*field.value) : -1;
+                        };
+                        ESP_LOGI(kTag, "Live printer telemetry ready: progress=%d%% nozzle=%d C bed=%d C",
+                                 number(fresh.progress), number(fresh.nozzle), number(fresh.bed));
+                        telemetry_confirmed = true;
+                    }
+                }
                 incoming.clear();
                 incoming_total = 0;
             }

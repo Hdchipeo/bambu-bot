@@ -27,7 +27,7 @@ Từ Desk-bot chỉ nhập nguyên file định nghĩa phần cứng vào [`main
 | --- | --- |
 | Hội thoại XiaoZhi, đầu robot 3D, icon máy in theo ảnh mẫu, icon đầu phun/bàn nhiệt | Cần cấu hình server và kiểm tra mic/loa thực tế |
 | Demo tiến độ A1, mỗi chu kỳ 120 giây; icon nhiệt độ và hai theme LCD | Không phải dữ liệu máy in thật |
-| MQTT TLS đọc trạng thái A1 qua LAN | Cần IP, serial, access code và CA PEM; chưa thử với A1 thật |
+| MQTT TLS đọc trạng thái A1 qua LAN | Đã xác nhận MQTT/telemetry với A1 thật; cần cấu hình LAN riêng, chưa kiểm thử chạy dài |
 | MCP `self.bambu.get_printer_status` | Server/model cần hỗ trợ công cụ MCP |
 | Gộp bản tin từng phần, tuổi dữ liệu theo trường, chống hoàn tất giả sau reconnect | Chưa lưu chống lặp sự kiện qua reboot |
 | Popup và âm báo khi hoàn tất hoặc có `print_error` mới | Chưa có giọng nói thông báo chủ động, giải mã HMS hay RAG Wiki |
