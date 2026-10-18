@@ -26,7 +26,7 @@
 namespace bambu {
 namespace {
 constexpr const char* kTag = "BambuBot";
-PrinterState state;
+PrinterState state(BAMBU_BMCU_MODE);
 esp_mqtt_client_handle_t client = nullptr;
 std::string report_topic, request_topic, incoming;
 int incoming_total = 0;
@@ -240,6 +240,7 @@ void StartService() {
         "Read Bambu A1 status. Call before answering printer status questions. "
         "demo=true means simulated data, never describe it as a real printer. "
         "Check connected, stale and each field's age/stale metadata; null means unknown. "
+        "HMS entries with ignored=true are expected BMCU compatibility warnings; do not announce them as active faults. "
         "This tool cannot control the printer or diagnose issues without documentation.",
         PropertyList(), [](const PropertyList&) -> ReturnValue { return state.ToJson(Now()); });
     McpServer::GetInstance().AddTool("self.bambu.get_notification_context",

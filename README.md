@@ -9,7 +9,7 @@
 [![ESP32-S3](https://img.shields.io/badge/Target-ESP32--S3-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-5.5.4-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://github.com/espressif/esp-idf)
 [![LVGL](https://img.shields.io/badge/UI-LVGL_9.5.0-00AE42?style=flat-square)](https://lvgl.io/)
-[![Firmware](https://img.shields.io/badge/Firmware-v0.5.0-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
+[![Firmware](https://img.shields.io/badge/Firmware-v0.5.1-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
 [![Host Tests](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml)
 [![Simulator](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
@@ -149,6 +149,8 @@ idf.py build
 idf.py -p /dev/cu.YOUR_ESP32_PORT flash monitor
 ```
 
+Nếu dùng **BMCU** với firmware cũ, đặt `"bmcu_mode": true` để bỏ riêng HMS tương thích `0500-0400-0001-0044`; xem [ngoại lệ BMCU](docs/VOICE_HMS_RAG.md#bmcu-thay-cho-ams).
+
 Điền IP, serial, access code và CA PEM phù hợp với máy in của bạn. Client xác thực chuỗi chứng chỉ bằng CA cung cấp, bỏ kiểm tra hostname vì kết nối bằng IP. Cần bảo đảm firmware/cấu hình LAN A1 cho phép MQTT; hiện chưa có tự khám phá máy in hoặc thu thập chứng chỉ.
 
 `bambu.local.json`, CA PEM và header sinh ra được Git bỏ qua. **Binary build với cấu hình LAN chứa thông tin xác thực cá nhân; không đưa lên release công khai.**
@@ -189,7 +191,7 @@ LCD **280×240** dùng frame dựng sẵn thay cho dựng hình 3D mỗi frame t
 | **Ba câu thoại mô phỏng** | **90.222 byte** trong assets, Opus 16 kHz / 60 ms |
 | **Scratch giải mã palette** | **34.886 byte**, dùng lại giữa các frame |
 | **Assets với custom wake word + MN7 English** | **7.374.642 byte**, còn **1.013.966 byte** trong phân vùng 8 MiB |
-| **App cùng cấu hình MN7** | **0x358e70 byte**, còn **15%** slot ứng dụng |
+| **App cùng cấu hình MN7** | **0x359140 byte**, còn **15%** slot ứng dụng |
 | **Nhịp phát mục tiêu** | **50 ms/frame → 20 FPS**; chưa đo FPS LCD khi chạy đồng thời MN7 |
 | **Dự phòng** | Thiếu/hỏng bank → renderer CPU 140×120, target 100 ms/frame |
 

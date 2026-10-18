@@ -21,3 +21,7 @@
 #ifndef BAMBU_WIKI_TOKEN
 #define BAMBU_WIKI_TOKEN ""
 #endif
+
+#ifndef BAMBU_BMCU_MODE
+#define BAMBU_BMCU_MODE false
+#endif

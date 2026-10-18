@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def generate(data, source_dir):
-    allowed = {"demo", "host", "serial", "access_code", "ca_file", "ota_url", "voice_notifications", "wiki_url", "wiki_token"}
+    allowed = {"demo", "host", "serial", "access_code", "ca_file", "ota_url", "voice_notifications", "wiki_url", "wiki_token", "bmcu_mode"}
     if set(data) - allowed:
         raise ValueError("Unknown configuration keys")
     demo = data.get("demo", True)
@@ -40,6 +40,9 @@ def generate(data, source_dir):
         parsed = urlparse(ota)
         if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password:
             raise ValueError("Invalid server OTA discovery URL")
+    bmcu = data.get("bmcu_mode", False)
+    if type(bmcu) is not bool:
+        raise ValueError("bmcu_mode must be true or false")
     voice = data.get("voice_notifications", True)
     if type(voice) is not bool:
         raise ValueError("voice_notifications must be true or false")
@@ -57,7 +60,7 @@ def generate(data, source_dir):
                 address=ipaddress.ip_address(parsed.hostname)
                 if not address.is_private or address.is_unspecified:raise ValueError("Use HTTPS outside the LAN")
             if not token:raise ValueError("wiki_token required for HTTP LAN backend")
-    values = {"BAMBU_DEMO": "true" if demo else "false", "BAMBU_VOICE_NOTIFICATIONS": "true" if voice else "false"}
+    values = {"BAMBU_BMCU_MODE": "true" if bmcu else "false", "BAMBU_DEMO": "true" if demo else "false", "BAMBU_VOICE_NOTIFICATIONS": "true" if voice else "false"}
     for key, value in (("HOST", host), ("SERIAL", serial), ("ACCESS_CODE", access),
                        ("TLS_CA_PEM", cert), ("OTA_URL", ota), ("WIKI_URL", wiki), ("WIKI_TOKEN", token)):
         values["BAMBU_" + key] = json.dumps(value, ensure_ascii=True)

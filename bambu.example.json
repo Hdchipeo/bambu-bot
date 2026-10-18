@@ -7,5 +7,6 @@
   "ota_url": "",
   "voice_notifications": true,
   "wiki_url": "",
-  "wiki_token": ""
+  "wiki_token": "",
+  "bmcu_mode": false
 }

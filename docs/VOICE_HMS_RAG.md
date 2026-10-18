@@ -91,6 +91,22 @@ với [DevHMS của Bambu Studio](https://github.com/bambulab/BambuStudio/blob/m
 Không tự suy đoán tên lỗi chưa có trong catalog. HMS fatal/serious ưu tiên giao
 diện lỗi; common hiển thị biểu cảm cảnh báo khi không đang hội thoại.
 
+## BMCU thay cho AMS
+
+Từ **0.5.1**, có thể đặt `"bmcu_mode": true` trong `bambu.local.json`, rồi chạy
+lại `scripts/configure.py` và build/nạp firmware Bambu Bot.
+
+Chế độ này chỉ bỏ qua **HMS `0500-0400-0001-0044`** (firmware AMS A không khớp
+máy in) theo cấu hình BMCU dùng firmware cũ. Mã này không kích hoạt biểu cảm
+Error/Warning, lời nhắc chủ động hoặc tra cứu lỗi đang hoạt động. Các HMS khác,
+`print_error` và trạng thái FAILED vẫn xử lý bình thường.
+
+Dữ liệu MCP gốc vẫn giữ mã này cùng `ignored=true`, `ignore_reason` và
+`bmcu_mode=true`, để chatbot biết đây là ngoại lệ chủ động, không nhắc nâng
+firmware như một lỗi cần xử lý. Mặc định `bmcu_mode=false` để máy dùng AMS thật
+vẫn hiển thị cảnh báo tương thích. Thiết lập chỉ thay hành vi Bambu Bot, không
+cập nhật firmware hoặc cấu hình của A1/BMCU.
+
 ## RAG trên Mac
 
 Bản thử nghiệm dùng **SQLite FTS5/BM25** truy hồi đoạn văn, sau đó **LLM của

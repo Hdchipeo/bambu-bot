@@ -92,5 +92,19 @@ int main() {
     assert(s.Apply(R"({"print":{"hms":[{"attr":1,"code":65537},{"attr":1,"code":65537}]}})",73003));
     assert(s.GetFreshSnapshot(73003).hms.value->size()==1);
     s.SetConnection(false);assert(!s.GetFreshSnapshot(73004).hms.value);
+    bambu::PrinterState bmcu(true),ams;
+    bmcu.SetConnection(true);ams.SetConnection(true);
+    const std::string mismatch=R"({"print":{"gcode_state":"RUNNING","print_error":0,"hms":[{"attr":83887104,"code":65604}]}})";
+    assert(bmcu.Apply(mismatch,0) && ams.Apply(mismatch,0));
+    assert(bmcu.GetFreshSnapshot(0).hms.value->empty());
+    assert(ams.GetFreshSnapshot(0).hms.value->size()==1); // Normal AMS retains the warning.
+    Json raw_bmcu(bmcu.ToJson(0));
+    assert(cJSON_IsTrue(raw_bmcu.get("bmcu_mode")));
+    assert(cJSON_IsTrue(cJSON_GetObjectItem(cJSON_GetArrayItem(raw_bmcu.get("hms"),0),"ignored")));
+    assert(bmcu.Apply(R"({"print":{"hms":[{"attr":83887104,"code":65604},{"attr":50331904,"code":65543}],"print_error":42}})",1));
+    const auto active=bmcu.GetFreshSnapshot(1);
+    assert(active.hms.value->size()==1 && (*active.hms.value)[0].Key()=="0300010000010007");
+    assert(active.error.value==42); // Other HMS and print_error are not suppressed.
+    assert((!bambu::HmsFault{0x05000400,0x00010045}.IgnoredForBmcu(true)));
     std::cout << "PASS: parser, partial updates, field freshness, reconnect, completion, error dedup and job isolation\n";
 }

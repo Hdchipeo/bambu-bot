@@ -33,7 +33,7 @@ def main():
         run([exe])
         notice_exe=str(Path(tmp)/"notifications_test")
         run([cxx,"-std=c++17","-Wall","-Wextra","-Werror",*flags,*includes,"-I","main/bambu",
-             "tests/notifications_test.cc","main/bambu/notifications.cc","main/bambu/voice_prompt.cc","main/bambu/hms.cc",*libs,"-o",notice_exe])
+             "tests/notifications_test.cc","main/bambu/printer_state.cc","main/bambu/notifications.cc","main/bambu/voice_prompt.cc","main/bambu/hms.cc",*libs,"-o",notice_exe])
         run([notice_exe])
         run(["python3", "-m", "unittest", "discover", "-s", "tests", "-p", "test_*.py"])
 

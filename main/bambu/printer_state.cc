@@ -142,6 +142,7 @@ std::string PrinterState::ToJson(int64_t now) const {
     std::lock_guard<std::mutex> lock(mutex_);
     auto root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "model", "A1");
+    cJSON_AddBoolToObject(root,"bmcu_mode",bmcu_mode_);
     cJSON_AddBoolToObject(root, "demo", snapshot_.demo);
     cJSON_AddBoolToObject(root, "connected", snapshot_.connected);
     cJSON_AddBoolToObject(root, "stale", !snapshot_.connected || !Fresh(snapshot_.state.updated_ms, now));
@@ -158,6 +159,8 @@ std::string PrinterState::ToJson(int64_t now) const {
         cJSON_AddStringToObject(item,"code",fault.DisplayCode().c_str());
         cJSON_AddStringToObject(item,"key",fault.Key().c_str());
         cJSON_AddStringToObject(item,"severity",fault.Severity());
+        cJSON_AddBoolToObject(item,"ignored",fault.IgnoredForBmcu(bmcu_mode_));
+        if(fault.IgnoredForBmcu(bmcu_mode_))cJSON_AddStringToObject(item,"ignore_reason","Expected AMS A firmware mismatch with BMCU; intentionally ignored by user");
         cJSON_AddNumberToObject(item,"attr",fault.attr);cJSON_AddNumberToObject(item,"raw_code",fault.code);
         cJSON_AddNumberToObject(item,"module_id",fault.attr>>24);
         cJSON_AddNumberToObject(item,"module_number",(fault.attr>>16)&255);
@@ -184,6 +187,10 @@ Snapshot PrinterState::GetFreshSnapshot(int64_t now) const {
     };
     expire(copy.state); expire(copy.job); expire(copy.progress); expire(copy.remaining);
     expire(copy.nozzle); expire(copy.bed); expire(copy.error); expire(copy.hms);
+    if(copy.hms.value){
+        auto& faults=*copy.hms.value;
+        faults.erase(std::remove_if(faults.begin(),faults.end(),[this](const HmsFault& f){return f.IgnoredForBmcu(bmcu_mode_);}),faults.end());
+    }
     return copy;
 }
 

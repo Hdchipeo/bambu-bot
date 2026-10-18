@@ -13,5 +13,5 @@ option(BAMBU_ANIMATION_PREVIEW "Cycle all scenes and head emotions with demo tel
 option(BAMBU_PRINTER_PREVIEW "Show printer check while assistant is idle; retain alerts" OFF)
 option(BAMBU_COFFEE_PREVIEW "Show coffee while assistant is idle; retain printer alerts" OFF)
 option(BAMBU_FORCE_DEMO "Build without local printer credentials" OFF)
-set(PROJECT_VER "0.5.0")
+set(PROJECT_VER "0.5.1")
 project(bambu_bot)

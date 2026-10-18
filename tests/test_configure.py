@@ -41,3 +41,8 @@ class ConfigureTests(unittest.TestCase):
                      {"wiki_url":"http://8.8.8.8","wiki_token":"test"},{"wiki_url":"https://user:pass@example.com"},
                      {"wiki_token":"bad\r\nheader"}]:
             with self.assertRaises(ValueError):configure.generate(data,Path("."))
+
+    def test_bmcu_mode_is_explicit_and_typed(self):
+        self.assertIn("#define BAMBU_BMCU_MODE false",configure.generate({},Path(".")))
+        self.assertIn("#define BAMBU_BMCU_MODE true",configure.generate({"bmcu_mode":True},Path(".")))
+        with self.assertRaises(ValueError):configure.generate({"bmcu_mode":"true"},Path("."))

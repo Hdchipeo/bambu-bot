@@ -32,6 +32,15 @@ int main(){
     Notifications missed;auto a=Status("PREPARE",0);missed.Observe(a,0);a=Status("RUNNING",31001);missed.Observe(a,31001);assert(!missed.Next(a,31001));
     Notifications failed;auto failure=Status("RUNNING",0);failed.Observe(failure,0);
     failure=Status("FAILED",1000);failed.Observe(failure,1000);assert(failed.Next(failure,1000)->kind==NoticeKind::Error);
+    PrinterState bmcu(true);bmcu.SetDemo(false);bmcu.SetConnection(true);
+    bmcu.Apply(R"({"print":{"gcode_state":"RUNNING"}})",0);
+    Notifications filtered;filtered.Observe(bmcu.GetFreshSnapshot(0),0);
+    bmcu.Apply(R"({"print":{"hms":[{"attr":83887104,"code":65604}]}})",1000);
+    auto filtered_snapshot=bmcu.GetFreshSnapshot(1000);filtered.Observe(filtered_snapshot,1000);
+    assert(!filtered.Next(filtered_snapshot,1000));
+    bmcu.Apply(R"({"print":{"hms":[{"attr":83887104,"code":65604},{"attr":50331904,"code":65543}]}})",2000);
+    filtered_snapshot=bmcu.GetFreshSnapshot(2000);filtered.Observe(filtered_snapshot,2000);
+    assert(filtered.Next(filtered_snapshot,2000)->kind==NoticeKind::Error);
     assert((HmsFault{0x03000100,0x00010007}.DisplayCode()=="0300-0100-0001-0007"));
     assert(std::string(HmsFault{0,0x00020001}.Severity())=="serious");
     for(const auto* kind:{"start","finish","error"}){
