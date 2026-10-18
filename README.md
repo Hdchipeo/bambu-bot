@@ -13,6 +13,8 @@ brew install cmake ninja sdl2
 
 ![Bambu Bot emotions](docs/ui/emotion-sheet.png)
 
+Studio **0.3.0** bổ sung [18 kịch bản 3D](docs/3D_SCENES.md) với chuyển 2D → 3D, đạo cụ động và hai theme. Mở bằng nút **3D scenes** hoặc phím **D**; đây là bản thử nghiệm simulator.
+
 Xem [hướng dẫn Studio](docs/UI_STUDIO.md). Renderer nằm trong `ui/`, tách khỏi SDL để dùng lại trên ESP32; đã tích hợp vào firmware **v0.2.0** cho Desk-bot 280×240.
 
 ## Bản thử nghiệm hiện tại

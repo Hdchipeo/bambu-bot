@@ -1,4 +1,5 @@
 #include "bambu_face.h"
+#include "scene3d.h"
 #include <SDL.h>
 #include <algorithm>
 #include <array>
@@ -17,12 +18,15 @@ using bambu::ui::FaceView;
 using bambu::ui::Telemetry;
 using bambu::ui::kBambuGreen;
 using bambu::ui::Theme;
+using bambu::studio::Scene;
+using bambu::studio::SceneView;
+using bambu::studio::DescribeScene;
 namespace fs = std::filesystem;
 static_assert(LVGL_VERSION_MAJOR==9 && LVGL_VERSION_MINOR==5 && LVGL_VERSION_PATCH==0,
               "Bambu Bot Studio is tested with LVGL 9.5.0");
 
 namespace {
-constexpr int kWidth=1160, kHeight=760, kCount=static_cast<int>(Emotion::Count);
+constexpr int kWidth=1160, kHeight=760, kCount=static_cast<int>(Emotion::Count), kScenes=static_cast<int>(Scene::Count);
 uint32_t ticks=0;
 lv_obj_t* Box(lv_obj_t* parent,int x,int y,int w,int h,uint32_t color,int radius=16) {
     auto obj=lv_obj_create(parent);
@@ -189,12 +193,14 @@ public:
         green_button_=Button(root_,636,37,144,32,"Green / White");
         lv_obj_add_event_cb(black_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->SetTheme(Theme::Black);},LV_EVENT_CLICKED,this);
         lv_obj_add_event_cb(green_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->SetTheme(Theme::Green);},LV_EVENT_CLICKED,this);
+        mode_button_=Button(root_,800,37,104,32,"3D scenes");
+        lv_obj_add_event_cb(mode_button_,[](lv_event_t* e){auto self=static_cast<Studio*>(lv_event_get_user_data(e));self->Set3D(!self->mode3d_);},LV_EVENT_CLICKED,this);
         preview_panel_=left;
         caption_=Label(left,0,550,"",&lv_font_montserrat_12,0x8CA391);
 
         auto right=Box(root_,696,108,432,585,0x101D16,22); Border(right,0x22362A);
-        Label(right,24,22,"Meet the moods",&lv_font_montserrat_24,0xEAF3E8);
-        Label(right,24,57,"Pick a feeling. Watch the little details.",&lv_font_montserrat_12,0x8CA391);
+        heading_=Label(right,24,22,"Meet the moods",&lv_font_montserrat_24,0xEAF3E8);
+        hint_=Label(right,24,57,"Pick a feeling. Watch the little details.",&lv_font_montserrat_12,0x8CA391);
         for (int i=0;i<kCount;++i) {
             auto& action=actions_[i]; action={this,i};
             auto button=Button(right,24+(i%2)*198,90+(i/2)*45,186,36,Describe(static_cast<Emotion>(i)).name);
@@ -204,6 +210,12 @@ public:
             lv_obj_add_event_cb(button,[](lv_event_t* e) {
                 auto action=static_cast<Action*>(lv_event_get_user_data(e)); action->studio->Select(action->index);
             },LV_EVENT_CLICKED,&action);
+        }
+        for (int i=0;i<kScenes;++i) {
+            scene_actions_[i]={this,i};
+            scene_buttons_[i]=Button(right,24+(i%2)*198,90+(i/2)*36,186,32,DescribeScene(static_cast<Scene>(i)).name);
+            lv_obj_add_flag(scene_buttons_[i],LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_event_cb(scene_buttons_[i],[](lv_event_t* e){auto action=static_cast<Action*>(lv_event_get_user_data(e));action->studio->SelectScene(action->index);},LV_EVENT_CLICKED,&scene_actions_[i]);
         }
         Label(right,24,425,"PRINT PROGRESS",&lv_font_montserrat_12,0x88A18D);
         progress_text_=Label(right,350,422,"42%",&lv_font_montserrat_16,0xC4EACB);
@@ -224,13 +236,15 @@ public:
         lv_obj_add_event_cb(motion_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->ToggleMotion();},LV_EVENT_CLICKED,this);
         Label(right,24,548,"DEMO data / No printer connection.",&lv_font_montserrat_12,0x728D7B);
         description_=Label(root_,48,710,"",&lv_font_montserrat_12,0x8CA391);
-        Label(root_,700,710,"SPACE Play  /  R Display  /  T Theme  /  M Motion",&lv_font_montserrat_12,0x728D7B);
+        Label(root_,680,710,"D 2D/3D / B Replay / SPACE Play / R / T / M",&lv_font_montserrat_12,0x728D7B);
         SetRound(true);
         Select(0);
     }
-    ~Studio() { face_.reset(); lv_obj_delete(root_); }
+    ~Studio() { scene_.reset();face_.reset(); lv_obj_delete(root_); }
     void SetRound(bool round) {
+        const auto scene_time=scene_?scene_->elapsed():0;
         round_=round;
+        scene_.reset();
         face_.reset();
         if (bezel_) lv_obj_delete(bezel_);
         int w=round?466:280,h=round?466:240;
@@ -240,7 +254,13 @@ public:
         lv_obj_set_pos(face_->root(),9,9);
         face_->SetTheme(theme_);
         face_->SetEmotion(static_cast<Emotion>(selected_));
-        face_->SetAnimated(motion_);
+        scene_=std::make_unique<SceneView>(bezel_,w,h,round);
+        lv_obj_set_pos(scene_->root(),9,9);
+        scene_->SetScene(static_cast<Scene>(selected_scene_));
+        face_->SetAnimated(motion_ && !mode3d_);
+        scene_->SetAnimated(motion_ && mode3d_);
+        scene_->RenderAt(scene_time);
+        lv_obj_add_flag(mode3d_?face_->root():scene_->root(),LV_OBJ_FLAG_HIDDEN);
         Border(round_button_,round?kBambuGreen:0x2A3A31);
         Border(rect_button_,round?0x2A3A31:kBambuGreen);
         lv_label_set_text(caption_,round?"466 x 466 AMOLED  /  Circular safe area":"280 x 240 LCD  /  Desk-bot test hardware");
@@ -249,10 +269,30 @@ public:
         UpdateTelemetry();
     }
     void SetTheme(Theme theme) {
-        theme_=theme; face_->SetTheme(theme);
+        theme_=theme; face_->SetTheme(theme);scene_->SetTheme(theme);
         Border(black_button_,theme==Theme::Black?kBambuGreen:0x2A3A31);
         Border(green_button_,theme==Theme::Green?kBambuGreen:0x2A3A31);
     }
+    void Set3D(bool enabled) {
+        mode3d_=enabled;
+        for (auto button:buttons_) {if(enabled)lv_obj_add_flag(button,LV_OBJ_FLAG_HIDDEN);else lv_obj_remove_flag(button,LV_OBJ_FLAG_HIDDEN);}
+        for (auto button:scene_buttons_) {if(enabled)lv_obj_remove_flag(button,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(button,LV_OBJ_FLAG_HIDDEN);}
+        lv_obj_add_flag(enabled?face_->root():scene_->root(),LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(enabled?scene_->root():face_->root(),LV_OBJ_FLAG_HIDDEN);
+        face_->SetAnimated(motion_ && !enabled);scene_->SetAnimated(motion_ && enabled);
+        lv_label_set_text(heading_,enabled?"Little 3D adventures":"Meet the moods");
+        lv_label_set_text(hint_,enabled?"Pick a story. Watch Bam come to life.":"Pick a feeling. Watch the little details.");
+        SetButtonText(mode_button_,enabled?"2D moods":"3D scenes");
+        if(enabled)SelectScene(selected_scene_);else Select(selected_);
+    }
+    void SelectScene(int index) {
+        selected_scene_=(index+kScenes)%kScenes;scene_->SetScene(static_cast<Scene>(selected_scene_));
+        for(int i=0;i<kScenes;++i)Border(scene_buttons_[i],i==selected_scene_?kBambuGreen:0x2A3A31);
+        lv_label_set_text(description_,DescribeScene(static_cast<Scene>(selected_scene_)).description);last_cycle_=ticks;
+    }
+    void Next(int step) {if(mode3d_)SelectScene(selected_scene_+step);else Select(selected_+step);}
+    void Replay() {if(mode3d_)scene_->Restart();}
+    void Toggle3D() {Set3D(!mode3d_);}
     void ToggleTheme() { SetTheme(theme_==Theme::Black?Theme::Green:Theme::Black); }
     void Select(int index) {
         int previous=selected_;
@@ -276,14 +316,19 @@ public:
         t.connected=selected_!=static_cast<int>(Emotion::Offline);
         t.progress=progress_; t.remaining_min=(100-progress_)*3/4;
         t.nozzle_c=220;t.bed_c=60;
-        face_->SetTelemetry(t);
+        face_->SetTelemetry(t);scene_->SetTelemetry(t);
         char percent[12]; snprintf(percent,sizeof(percent),"%d%%",progress_);
         lv_label_set_text(progress_text_,percent);
         lv_slider_set_value(slider_,progress_,LV_ANIM_OFF);
     }
     void ToggleAuto() { auto_=!auto_; SetButtonText(play_button_,auto_?"Pause sequence":"Play sequence"); last_cycle_=ticks; }
-    void ToggleMotion() { motion_=!motion_;face_->SetAnimated(motion_);SetButtonText(motion_button_,motion_?"Motion on":"Motion off"); }
-    void Tick() { if (auto_ && ticks-last_cycle_>=3500) Select(selected_+1); }
+    void ToggleMotion() { motion_=!motion_;face_->SetAnimated(motion_ && !mode3d_);scene_->SetAnimated(motion_ && mode3d_);SetButtonText(motion_button_,motion_?"Motion on":"Motion off"); }
+    void Tick() { if (auto_ && ticks-last_cycle_>=(mode3d_?9000u:3500u)) Next(1); }
+    SceneView& scene() {return *scene_;}
+    lv_obj_t* mode_button() {return mode_button_;}
+    lv_obj_t* scene_button(int i) {return scene_buttons_[i];}
+    bool mode3d() const {return mode3d_;}
+    int selected_scene() const {return selected_scene_;}
     lv_obj_t* black_button() {return black_button_;}
     lv_obj_t* green_button() {return green_button_;}
     int selected() const {return selected_;}
@@ -303,6 +348,12 @@ private:
     lv_obj_t *root_=nullptr,*preview_panel_=nullptr,*bezel_=nullptr,*caption_=nullptr,*description_=nullptr;
     lv_obj_t *round_button_=nullptr,*rect_button_=nullptr,*progress_text_=nullptr,*slider_=nullptr,*play_button_=nullptr,*motion_button_=nullptr;
     lv_obj_t *black_button_=nullptr,*green_button_=nullptr;
+    lv_obj_t *mode_button_=nullptr,*heading_=nullptr,*hint_=nullptr;
+    bool mode3d_=false;
+    int selected_scene_=0;
+    std::array<lv_obj_t*,kScenes> scene_buttons_{};
+    std::array<Action,kScenes> scene_actions_{};
+    std::unique_ptr<SceneView> scene_;
     Theme theme_=Theme::Black;
     std::array<lv_obj_t*,kCount> buttons_{},dots_{};
     std::array<Action,kCount> actions_{};
@@ -440,7 +491,30 @@ void SelfTest(Canvas& canvas) {
     const int before_cycle=studio.selected();
     studio.ToggleAuto();canvas.Frame(ticks+3600);studio.Tick();
     Require(studio.selected()==(before_cycle+1)%kCount,"Auto sequence failed");
-    std::cout<<"PASS: fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, both themes on both displays, compact layout without DEMO, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
+    studio.ToggleAuto(); // Stop the old emotion sequence before testing 3D.
+    FastClick(canvas,studio.mode_button());Require(studio.mode3d(),"3D mode button failed");
+    for(bool round:{false,true})for(Theme theme:{Theme::Black,Theme::Green}) {
+        studio.SetRound(round);studio.SetTheme(theme);studio.scene().SetAnimated(false);
+        const auto nodes=lv_obj_get_child_count(studio.scene().root());
+        for(int i=0;i<kScenes;++i) {
+            FastClick(canvas,studio.scene_button(i));Require(studio.selected_scene()==i,"Scene button failed");
+            for(uint32_t time:{0u,600u,1200u,2500u,5000u,9000u,17000u}) {
+                studio.scene().RenderAt(time);canvas.Frame(ticks+33);
+                Require(!studio.scene().overflowed(),"3D primitive pool exhausted");
+                Require(studio.scene().primitive_count()>50,"3D mesh missing");
+                Require(lv_obj_get_child_count(studio.scene().root())==nodes,"Scene created transient LVGL objects");
+            }
+            studio.Replay();Require(studio.scene().elapsed()==0,"2D to 3D replay failed");
+        }
+    }
+    studio.scene().SetAnimated(false);studio.scene().RenderAt(2500);canvas.Frame(ticks+1000);
+    Require(studio.scene().elapsed()==2500,"Paused scene advanced");
+    studio.scene().SetAnimated(true);canvas.Frame(ticks+1000);studio.scene().SetAnimated(false);
+    Require(studio.scene().elapsed()>2500,"Scene did not resume");
+    const auto preserved_time=studio.scene().elapsed();studio.SetRound(!studio.round());
+    Require(studio.scene().elapsed()==preserved_time,"Display switch reset scene time");
+    FastClick(canvas,studio.mode_button());Require(!studio.mode3d(),"Return to 2D failed");
+    std::cout<<"PASS: 18 3D scenes, replay, 2 themes, 2 displays, bounded mesh pools; fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, both themes on both displays, compact layout without DEMO, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
 }
 
 void Export(Canvas& canvas,const fs::path& output) {
@@ -461,6 +535,25 @@ void Export(Canvas& canvas,const fs::path& output) {
             studio.Select(i);canvas.Frame(ticks+1000);
             canvas.Save(output/(std::string("emotion-")+Describe(static_cast<Emotion>(i)).name+".bmp"));
             canvas.SaveLcd(studio.face().root(),output/(std::string("lcd-")+Describe(static_cast<Emotion>(i)).name+".bmp"));
+        }
+    }
+    {
+        Studio studio;studio.Set3D(true);studio.scene().SetAnimated(false);
+        for(bool round:{true,false})for(Theme theme:{Theme::Black,Theme::Green}) {
+            studio.SetRound(round);studio.SetTheme(theme);studio.scene().SetAnimated(false);
+            for(int i=0;i<kScenes;++i) {
+                studio.SelectScene(i);studio.scene().RenderAt(3200);canvas.Frame(ticks+33);
+                std::string name="scene-"+std::to_string(i)+(round?"-round":"-deskbot")+(theme==Theme::Black?"-black":"-green");
+                canvas.SaveLcd(studio.scene().root(),output/(name+".bmp"));
+            }
+        }
+        studio.SetRound(true);studio.SetTheme(Theme::Black);studio.SelectScene(1);studio.scene().SetAnimated(false);
+        studio.scene().RenderAt(3200);canvas.Frame(ticks+33);canvas.Save(output/"studio-3d.bmp");
+        fs::create_directories(output/"animation");
+        for(int i=0;i<80;++i) {
+            studio.scene().RenderAt(i*80);canvas.Frame(ticks+1);
+            char name[32];std::snprintf(name,sizeof(name),"frame-%03d.bmp",i);
+            canvas.SaveLcd(studio.scene().root(),output/"animation"/name);
         }
     }
     auto sheet=Box(lv_screen_active(),0,0,kWidth,kHeight,0x0B120F,0);
@@ -509,8 +602,10 @@ int main(int argc,char** argv) {
                 if (event.type==SDL_KEYDOWN && !event.key.repeat) {
                     switch (event.key.keysym.sym) {
                         case SDLK_ESCAPE:running=false;break;
-                        case SDLK_RIGHT:studio.Select(studio.selected()+1);break;
-                        case SDLK_LEFT:studio.Select(studio.selected()-1);break;
+                        case SDLK_RIGHT:studio.Next(1);break;
+                        case SDLK_LEFT:studio.Next(-1);break;
+                        case SDLK_d:studio.Toggle3D();break;
+                        case SDLK_b:studio.Replay();break;
                         case SDLK_SPACE:studio.ToggleAuto();break;
                         case SDLK_t:studio.ToggleTheme();break;
                         case SDLK_r:studio.SetRound(!studio.round());break;
