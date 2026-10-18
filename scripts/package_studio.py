@@ -6,6 +6,7 @@ import platform
 import shutil
 import subprocess
 import tempfile
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,7 +71,10 @@ def main():
         subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(staged)], check=True)
         subprocess.run(["codesign", "--verify", "--deep", "--strict", str(staged)], check=True)
         subprocess.run([str(binary), "--self-test"], check=True)
-        subprocess.run(["ditto", "-c", "-k", "--keepParent", str(staged), str(archive)], check=True)
+        subprocess.run(["ditto", "-c", "-k", "--norsrc", "--noextattr", "--keepParent", str(staged), str(archive)], check=True)
+        with zipfile.ZipFile(archive) as package:
+            if package.testzip() is not None or any("/._" in name for name in package.namelist()):
+                raise SystemExit("Package integrity or AppleDouble metadata check failed.")
         if destination.exists():
             shutil.rmtree(destination)
         copy_clean(staged, destination)
