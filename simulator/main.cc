@@ -585,30 +585,59 @@ void SelfTest(Canvas& canvas) {
         SceneView round(lv_screen_active(),466,466,true);round.SetAnimated(false);round.SetScene(Scene::Coffee);
         Require(!round.coffee_playback_active(),"280x240 clip used on round screen");
     }
+    {
+        using bambu::ui::PrinterClip;
+        Require(PrinterClip::FrameAt(1199)==23 && PrinterClip::FrameAt(1200)==24,"Printer intro timing");
+        Require(PrinterClip::FrameAt(4400)==24 && PrinterClip::FrameAt(4450)==25,"Printer loop timing");
+        std::vector<uint16_t> decoded(PrinterClip::Width()*PrinterClip::Height());
+        for(bool green:{false,true})for(uint32_t frame=0;frame<PrinterClip::kFrames;++frame)
+            Require(PrinterClip::Decode(green,frame,decoded.data(),decoded.size()),"Invalid printer clip frame");
+        Require(!PrinterClip::Decode(false,88,decoded.data(),decoded.size()),"Invalid printer frame accepted");
+        Require(!PrinterClip::Decode(false,0,decoded.data(),decoded.size()-1),"Wrong printer dimensions accepted");
+        SceneView view(lv_screen_active(),280,240,false,2,100);view.SetAnimated(false);view.SetScene(Scene::Printer);
+        const auto objects=ObjectCount(view.root());
+        for(auto theme:{Theme::Black,Theme::Green}){view.SetTheme(theme);view.SetEmotion(Emotion::Printing);
+            for(int i=0;i<176;++i){view.RenderAt(i*50);canvas.Frame(ticks+50);Require(view.printer_playback_active(),"Printer did not use clip");}}
+        Telemetry live;live.demo=false;live.connected=true;live.progress=64;live.nozzle_c=217;live.bed_c=62;view.SetTelemetry(live);
+        Require(AllText(view.root()).find("64%")!=std::string::npos,"Printer HUD not live");
+        live.stale=true;view.SetTelemetry(live);Require(AllText(view.root()).find("--%")!=std::string::npos,"Printer stale HUD not cleared");
+        for(auto emotion:{Emotion::Warning,Emotion::Error,Emotion::Completed,Emotion::Listening,Emotion::Speaking,Emotion::Sleepy,Emotion::Offline}){
+            view.SetEmotion(emotion);Require(!view.printer_playback_active(),"Printer clip masks priority state");}
+        view.SetEmotion(Emotion::Idle);
+        for(int i=0;i<20;++i){view.SetScene(i%2?Scene::Printer:Scene::Coffee);view.RenderAt(2500);canvas.Frame(ticks+50);}
+        Require(view.playback_buffer_bytes()==112000,"Shared clip buffers grew while switching scenes");
+        Require(ObjectCount(view.root())==objects,"Printer clip allocated transient widgets");
+        view.SetScene(Scene::Printer);view.SetAnimated(true);canvas.Frame(ticks+50);view.SetAnimated(false);const auto elapsed=view.elapsed();canvas.Frame(ticks+1000);
+        Require(view.elapsed()==elapsed,"Printer clip pause failed");view.Restart();Require(view.playback_frame()==0,"Printer intro replay failed");
+        view.EnablePrinterPlayback(false);Require(!view.printer_playback_active(),"Printer mesh comparison unavailable");
+        SceneView round(lv_screen_active(),466,466,true);round.SetAnimated(false);round.SetScene(Scene::Printer);
+        Require(!round.printer_playback_active(),"Printer clip used on round display");
+    }
+    std::cout<<"PASS: 176 Printer check frames, loop timing, bounded shared clip buffers, switching, telemetry, interruption and pause/replay\n";
     std::cout<<"PASS: all 300 coffee frames, decoder bounds, seamless timing, native RGB565 playback, bounded RAM/widgets, independent live/stale HUD and priority/pause/replay\n";
     std::cout<<"PASS: firmware 140x120 raster, scaling, real/demo labels, scene priorities and conversation emotions; 18 3D scenes, replay, 2 themes, 2 displays, bounded mesh pools; fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, both themes on both displays, compact layout without DEMO, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
 }
 
 // Offline asset capture contains geometry only: never telemetry, labels or credentials.
-void ExportCoffeePreview(Canvas& canvas,const fs::path& output) {
-    SceneView view(lv_screen_active(),280,240,false,2,100);view.SetAnimated(false);view.SetScene(Scene::Coffee);
+void ExportCoffeePreview(Canvas& canvas,const fs::path& output,bool printer=false) {
+    SceneView view(lv_screen_active(),280,240,false,2,100);view.SetAnimated(false);view.SetScene(printer?Scene::Printer:Scene::Coffee);
     Telemetry live;live.demo=false;live.connected=true;live.progress=42;live.nozzle_c=220;live.bed_c=60;view.SetTelemetry(live);
     for(auto theme:{Theme::Black,Theme::Green}) {
         const auto path=output/(theme==Theme::Black?"black":"green");fs::create_directories(path);view.SetTheme(theme);
-        for(int i=0;i<150;++i){view.RenderAt(i*50);canvas.Frame(ticks+50);
+        for(int i=0;i<(printer?88:150);++i){view.RenderAt(i*50);canvas.Frame(ticks+50);
             char name[32];std::snprintf(name,sizeof(name),"frame-%03d.bmp",i);canvas.SaveLcd(view.root(),path/name);}
     }
 }
 
-void ExportCoffee(const fs::path& output) {
+void ExportCoffee(const fs::path& output, bool printer=false) {
     fs::create_directories(output);
     SceneView source(lv_screen_active(),280,240,false);source.SetAnimated(false);
-    source.EnableCoffeePlayback(false);source.SetScene(Scene::Coffee);
+    source.EnableCoffeePlayback(false);source.EnablePrinterPlayback(false);source.SetScene(printer?Scene::Printer:Scene::Coffee);
     for(auto theme:{Theme::Black,Theme::Green}) {
         source.SetTheme(theme);
-        for(int i=0;i<150;++i) {
+        for(int i=0;i<(printer?88:150);++i) {
             // 24 intro frames, then 126 evenly spaced frames across a seamless 2*pi loop.
-            const uint32_t elapsed=i<24?i*50:1200+static_cast<uint32_t>((i-24)*6283.185307/126);
+            const uint32_t elapsed=i<24?i*50:1200+static_cast<uint32_t>((i-24)*6283.185307/(printer?64:126));
             source.RenderAt(elapsed);const auto& pixels=source.RasterFrame();
             auto surface=SDL_CreateRGBSurfaceWithFormatFrom(const_cast<uint32_t*>(pixels.data()),280,240,32,280*4,SDL_PIXELFORMAT_RGB888);
             if(!surface)throw std::runtime_error(SDL_GetError());
@@ -617,7 +646,7 @@ void ExportCoffee(const fs::path& output) {
             if(result<0)throw std::runtime_error(SDL_GetError());
         }
     }
-    std::cout<<"Exported 300 native-resolution geometry frames to "<<output<<'\n';
+    std::cout<<"Exported "<<(printer?176:300)<<" native-resolution geometry frames to "<<output<<'\n';
 }
 
 void Export(Canvas& canvas,const fs::path& output) {
@@ -693,26 +722,32 @@ void Export(Canvas& canvas,const fs::path& output) {
 }  // namespace
 
 int main(int argc,char** argv) {
-    bool headless=false,self_test=false,coffee_demo=false;
-    fs::path output,coffee_output,coffee_preview;
+    bool headless=false,self_test=false,coffee_demo=false,printer_demo=false;
+    fs::path output,coffee_output,coffee_preview,printer_output,printer_preview;
     for (int i=1;i<argc;++i) {
         if (!std::strcmp(argv[i],"--self-test")) {headless=true;self_test=true;}
+        else if (!std::strcmp(argv[i],"--printer-demo")) printer_demo=true;
+        else if (!std::strcmp(argv[i],"--printer-preview") && i+1<argc) {headless=true;printer_preview=argv[++i];}
         else if (!std::strcmp(argv[i],"--coffee-demo")) coffee_demo=true;
         else if (!std::strcmp(argv[i],"--coffee-preview") && i+1<argc) {headless=true;coffee_preview=argv[++i];}
         else if (!std::strcmp(argv[i],"--headless")) headless=true;
+        else if (!std::strcmp(argv[i],"--export-printer") && i+1<argc) {headless=true;printer_output=argv[++i];}
         else if (!std::strcmp(argv[i],"--export-coffee") && i+1<argc) {headless=true;coffee_output=argv[++i];}
         else if (!std::strcmp(argv[i],"--output") && i+1<argc) output=argv[++i];
-        else {std::cerr<<"Usage: bambu_studio [--coffee-demo] [--self-test] [--headless --output DIRECTORY] [--export-coffee DIRECTORY] [--coffee-preview DIRECTORY]\n";return 2;}
+        else {std::cerr<<"Usage: bambu_studio [--coffee-demo | --printer-demo] [--self-test] [--headless --output DIRECTORY] [--export-coffee DIRECTORY | --export-printer DIRECTORY] [--coffee-preview DIRECTORY | --printer-preview DIRECTORY]\n";return 2;}
     }
-    if (headless && !self_test && output.empty() && coffee_output.empty() && coffee_preview.empty()) {std::cerr<<"Headless mode requires --self-test or --output\n";return 2;}
+    if (headless && !self_test && output.empty() && coffee_output.empty() && coffee_preview.empty() && printer_output.empty() && printer_preview.empty()) {std::cerr<<"Headless mode requires --self-test or --output\n";return 2;}
     try {
         Canvas canvas(headless);
         if (self_test) SelfTest(canvas);
         if (!output.empty()) Export(canvas,output);
         if (!coffee_output.empty()) ExportCoffee(coffee_output);
+        if (!printer_output.empty()) ExportCoffee(printer_output,true);
         if (!coffee_preview.empty()) ExportCoffeePreview(canvas,coffee_preview);
+        if (!printer_preview.empty()) ExportCoffeePreview(canvas,printer_preview,true);
         if (headless) return 0;
         Studio studio;
+        if(printer_demo){studio.SetRound(false);studio.Set3D(true);studio.SelectScene(static_cast<int>(Scene::Printer));}
         if(coffee_demo){studio.SetRound(false);studio.Set3D(true);studio.SelectScene(static_cast<int>(Scene::Coffee));}
         bool running=true;
         while (running) {

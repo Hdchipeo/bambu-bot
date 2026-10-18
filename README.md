@@ -100,3 +100,7 @@ The 280×240 coffee scene now uses pre-rendered 3D frames and native LVGL teleme
 with a 20 FPS target. Try `./scripts/run_simulator.sh --coffee-demo`.
 See [the experiment and preview](docs/COFFEE_PLAYBACK.md) for the isolated demo
 firmware profile, memory budget and verification limits.
+
+Printer check also has a pre-rendered 280×240 experiment, alongside Coffee.
+Try `./scripts/run_simulator.sh --printer-demo`; see
+[the preview and firmware profile](docs/PRINTER_PLAYBACK.md).

@@ -33,6 +33,7 @@ def main():
     manifest = {"project": "bambu-bot", "version": version, "profile": "deskbot-demo",
                 "forced_demo": forced_demo,
                 "coffee_preview": "BAMBU_COFFEE_PREVIEW:BOOL=ON" in cache,
+                "printer_preview": "BAMBU_PRINTER_PREVIEW:BOOL=ON" in cache,
                 "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "sha256": {name: hashlib.sha256((build / src).read_bytes()).hexdigest()
                            for name, src in sources.items()}}
@@ -43,8 +44,8 @@ This is simulated printer data. Servo outputs are disabled.
 UI: short BOOT toggles chat; hold BOOT toggles black/green vs green/white theme.
 Theme is saved to NVS. The compact LCD intentionally hides the DEMO label.
 Head-only 3D UI renders at 140x120, scaled to 280x240; telemetry icons/text are native resolution.
-Coffee on 280x240 uses native 167x129 pre-rendered RGB565 frames, 50 ms target (20 FPS).
-Other 3D scenes retain the 100 ms CPU renderer. When enabled, the coffee preview profile
+Coffee and Printer check use cropped native RGB565 frames, 50 ms target (20 FPS).
+Other 3D scenes retain the 100 ms CPU renderer. When enabled, an animation preview profile
 overrides idle/printing visuals; conversation and printer alerts take priority.
 Actual LCD FPS and audio/MQTT performance of this experimental clip are unverified.
 

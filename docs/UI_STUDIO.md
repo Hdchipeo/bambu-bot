@@ -140,3 +140,10 @@ pre-rendered RGB565 frames, with a 20 FPS scheduling target and independent
 LVGL telemetry. Start directly with `./scripts/run_simulator.sh --coffee-demo`.
 See [COFFEE_PLAYBACK.md](COFFEE_PLAYBACK.md) for memory costs, build profiles,
 asset generation and hardware validation limits.
+
+### Printer check playback experiment
+
+Studio 0.3.5 also plays pre-rendered **Printer check** frames on Desk-bot 280×240.
+Start directly with `./scripts/run_simulator.sh --printer-demo`.
+Coffee and Printer check share two RGB565 buffers; the HUD remains independent.
+See [PRINTER_PLAYBACK.md](PRINTER_PLAYBACK.md) for the preview and build profile.

@@ -27,6 +27,7 @@ void BambuDisplay::SetupUI() {
     scene_ = std::make_unique<bambu::ui::SceneView>(screen, width_, height_, width_ == height_, 2, 100);
     ESP_LOGI("BambuDisplay", "3D head UI: %dx%d raster, %dx%d native HUD; 100 ms frame target", width_/2, height_/2, width_, height_);
     ESP_LOGI("BambuDisplay", "Coffee clip: 20 FPS target, %u flash bytes, cropped RGB565 double buffer", static_cast<unsigned>(bambu::ui::CoffeeClip::FlashBytes()));
+    ESP_LOGI("BambuDisplay", "Printer check clip: 20 FPS target, %u flash bytes; shared RGB565 buffers", static_cast<unsigned>(bambu::ui::PrinterClip::FlashBytes()));
     // Retain the upstream multilingual font for provisioning, activation and chat.
     message_panel_ = lv_obj_create(screen);
     lv_obj_remove_style_all(message_panel_);
@@ -82,6 +83,12 @@ void BambuDisplay::Refresh() {
                      (emotion == Emotion::Idle || emotion == Emotion::Printing);
     if (coffee_preview) emotion = Emotion::Idle;
 #endif
+    bool printer_preview = false;
+#ifdef BAMBU_PRINTER_PREVIEW
+    printer_preview = device == kDeviceStateIdle && requested_ == Emotion::Idle && !sleeping_ &&
+                      (emotion == Emotion::Idle || emotion == Emotion::Printing);
+    if (printer_preview) emotion = Emotion::Idle;
+#endif
     const uint32_t now = lv_tick_get();
     if(emotion==Emotion::Idle && active_emotion_!=Emotion::Idle)idle_started_=now;
     active_emotion_=emotion;
@@ -90,7 +97,7 @@ void BambuDisplay::Refresh() {
         emotion==Emotion::Completed ? printer_state=="FINISH" :
         emotion==Emotion::Printing ? printer_state=="RUNNING"||printer_state=="PREPARE" :
         emotion==Emotion::Warning && printer_state=="PAUSE";
-    auto selected=coffee_preview?bambu::ui::Scene::Coffee:bambu::ui::AutomaticScene(emotion,(now-idle_started_)/12000,printer_visual);
+    auto selected=printer_preview?bambu::ui::Scene::Printer:coffee_preview?bambu::ui::Scene::Coffee:bambu::ui::AutomaticScene(emotion,(now-idle_started_)/12000,printer_visual);
     if(selected!=active_scene_){active_scene_=selected;scene_->SetScene(selected);if(sleeping_)scene_->RenderAt(2500);}
     scene_->SetEmotion(emotion);
     if (!notification_.empty() && now - notification_started_ >= notification_duration_) notification_.clear();

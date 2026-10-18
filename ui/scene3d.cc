@@ -49,8 +49,8 @@ SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round,int render_divisor,
  lv_obj_set_style_bg_opa(root_,LV_OPA_COVER,0);
  lv_obj_remove_flag(root_,static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_SCROLLABLE|LV_OBJ_FLAG_CLICKABLE));
  lv_obj_add_event_cb(root_,[](lv_event_t* e){static_cast<SceneView*>(lv_event_get_user_data(e))->Draw(lv_event_get_layer(e));},LV_EVENT_DRAW_MAIN,this);
- coffee_image_=lv_image_create(root_);lv_obj_set_pos(coffee_image_,CoffeeClip::X(),CoffeeClip::Y());
- lv_obj_add_flag(coffee_image_,LV_OBJ_FLAG_HIDDEN);lv_obj_remove_flag(coffee_image_,LV_OBJ_FLAG_CLICKABLE);
+ clip_image_=lv_image_create(root_);lv_obj_set_pos(clip_image_,CoffeeClip::X(),CoffeeClip::Y());
+ lv_obj_add_flag(clip_image_,LV_OBJ_FLAG_HIDDEN);lv_obj_remove_flag(clip_image_,LV_OBJ_FLAG_CLICKABLE);
  title_=lv_label_create(root_);footer_=lv_label_create(root_);
  for(auto label:{title_,footer_}) {
   lv_obj_set_style_text_font(label,w<320?&lv_font_montserrat_12:&lv_font_montserrat_14,0);
@@ -64,7 +64,7 @@ SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round,int render_divisor,
   auto now=lv_tick_get();auto dt=now-self->last_tick_;self->last_tick_=now;self->RenderAt(self->elapsed_+dt);
  },std::max<uint32_t>(33,frame_period_ms),this);
 }
-SceneView::~SceneView(){if(timer_)lv_timer_delete(timer_);for(auto& image:coffee_images_)lv_image_cache_drop(&image);lv_image_cache_drop(&image_);printer_icon_.reset();lv_obj_delete(root_);}
+SceneView::~SceneView(){if(timer_)lv_timer_delete(timer_);for(auto& image:clip_images_)lv_image_cache_drop(&image);lv_image_cache_drop(&image_);printer_icon_.reset();lv_obj_delete(root_);}
 void SceneView::SetScene(Scene scene){scene_=static_cast<size_t>(scene)>=info.size()?Scene::Game:scene;Restart();}
 void SceneView::SetEmotion(Emotion emotion){if(emotion_==emotion)return;emotion_=emotion;RenderAt(elapsed_);}
 void SceneView::SetTheme(ui::Theme theme){theme_=theme;ink_=theme==ui::Theme::Black?ui::kBambuGreen:0xFFFFFF;bg_=theme==ui::Theme::Black?0:ui::kBambuGreen;
@@ -79,31 +79,43 @@ void SceneView::SetTelemetry(const ui::Telemetry& telemetry){telemetry_=telemetr
 void SceneView::SetAnimated(bool animated){animated_=animated;last_tick_=lv_tick_get();if(timer_){if(animated)lv_timer_resume(timer_);else lv_timer_pause(timer_);}}
 void SceneView::Restart(){last_tick_=lv_tick_get();RenderAt(0);}
 void SceneView::EnableCoffeePlayback(bool enabled){coffee_enabled_=enabled;RenderAt(elapsed_);}
-void SceneView::UpdateCoffeePlayback(){
- const bool active=coffee_enabled_ && width_==280 && height_==240 && !round_ && scene_==Scene::Coffee && emotion_==Emotion::Idle;
- if(active!=coffee_active_){
-  coffee_active_=active;coffee_frame_=UINT32_MAX;
+void SceneView::EnablePrinterPlayback(bool enabled){printer_enabled_=enabled;RenderAt(elapsed_);}
+void SceneView::UpdatePlayback(){
+ const bool printer=scene_==Scene::Printer;
+ const bool eligible=printer ? printer_enabled_ && (emotion_==Emotion::Idle||emotion_==Emotion::Printing) :
+     coffee_enabled_ && scene_==Scene::Coffee && emotion_==Emotion::Idle;
+ const bool active=eligible && width_==280 && height_==240 && !round_;
+ if(active!=clip_active_ || (active && scene_!=clip_scene_)){
+  clip_active_=active;clip_scene_=scene_;clip_frame_=UINT32_MAX;
   if(timer_)lv_timer_set_period(timer_,active?CoffeeClip::kFrameMs:frame_period_ms_);
-  if(!active)lv_obj_add_flag(coffee_image_,LV_OBJ_FLAG_HIDDEN);
+  if(!active)lv_obj_add_flag(clip_image_,LV_OBJ_FLAG_HIDDEN);
   lv_obj_invalidate(root_); // Clear the previous rendering mode exactly once.
  }
  if(!active)return;
- const auto frame=CoffeeClip::FrameAt(elapsed_);
- if(frame==coffee_frame_ && coffee_theme_==theme_)return;
- const auto next=1-coffee_buffer_;auto& pixels=coffee_pixels_[next];
- if(pixels.empty())pixels.resize(CoffeeClip::Width()*CoffeeClip::Height());
- if(!CoffeeClip::Decode(theme_==ui::Theme::Green,frame,pixels.data(),pixels.size()))return;
- auto& image=coffee_images_[next];lv_image_cache_drop(&image);
+ const auto frame=printer?PrinterClip::FrameAt(elapsed_):CoffeeClip::FrameAt(elapsed_);
+ const int width=printer?PrinterClip::Width():CoffeeClip::Width();
+ const int height=printer?PrinterClip::Height():CoffeeClip::Height();
+ if(frame==clip_frame_ && clip_theme_==theme_)return;
+ const auto next=1-clip_buffer_;auto& pixels=clip_pixels_[next];
+ auto& image=clip_images_[next];lv_image_cache_drop(&image);
+ // Reserve once for both clips, so alternating scenes never grows capacity.
+ const auto capacity=static_cast<size_t>(std::max(CoffeeClip::Width()*CoffeeClip::Height(),PrinterClip::Width()*PrinterClip::Height()));
+ if(pixels.capacity()<capacity)pixels.reserve(capacity);
+ pixels.resize(width*height);
+ const bool decoded=printer?PrinterClip::Decode(theme_==ui::Theme::Green,frame,pixels.data(),pixels.size()):
+     CoffeeClip::Decode(theme_==ui::Theme::Green,frame,pixels.data(),pixels.size());
+ if(!decoded)return;
+ lv_obj_set_pos(clip_image_,printer?PrinterClip::X():CoffeeClip::X(),printer?PrinterClip::Y():CoffeeClip::Y());
  image.header.magic=LV_IMAGE_HEADER_MAGIC;image.header.cf=LV_COLOR_FORMAT_RGB565;
- image.header.w=CoffeeClip::Width();image.header.h=CoffeeClip::Height();image.header.stride=CoffeeClip::Width()*2;
+ image.header.w=width;image.header.h=height;image.header.stride=width*2;
  image.data_size=pixels.size()*2;image.data=reinterpret_cast<const uint8_t*>(pixels.data());
- lv_image_set_src(coffee_image_,&image);lv_obj_remove_flag(coffee_image_,LV_OBJ_FLAG_HIDDEN);
- coffee_buffer_=next;coffee_frame_=frame;coffee_theme_=theme_;
+ lv_image_set_src(clip_image_,&image);lv_obj_remove_flag(clip_image_,LV_OBJ_FLAG_HIDDEN);
+ clip_buffer_=next;clip_frame_=frame;clip_theme_=theme_;
 }
 static void SetLabelIfChanged(lv_obj_t* label,const char* text) {
  if(std::strcmp(lv_label_get_text(label),text)!=0)lv_label_set_text(label,text);
 }
-void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;UpdateCoffeePlayback();if(!coffee_active_)Build();
+void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;UpdatePlayback();if(!clip_active_)Build();
  SetLabelIfChanged(title_,emotion_!=Emotion::Idle?Describe(emotion_).name:elapsed<1200?"BAMBU BOT / 2D > 3D":DescribeScene(scene_).name);
  char text[96];
  if(scene_==Scene::Error)std::snprintf(text,sizeof(text),"%sPrinter needs attention",telemetry_.demo?"DEMO / ":"");
@@ -112,7 +124,7 @@ void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;UpdateCoffeePlayback
  else text[0]=0;
  SetLabelIfChanged(footer_,text);
  if(text[0])lv_obj_remove_flag(footer_,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(footer_,LV_OBJ_FLAG_HIDDEN);
- UpdateTelemetryHud();if(!coffee_active_)lv_obj_invalidate(root_);
+ UpdateTelemetryHud();if(!clip_active_)lv_obj_invalidate(root_);
 }
 void SceneView::CreateTelemetryHud(){
  hud_=lv_obj_create(root_);lv_obj_remove_style_all(hud_);
@@ -226,9 +238,9 @@ void SceneView::Head(float m,float time){
 void SceneView::Build(){
  count_=0;overflow_=false;float t=elapsed_/1000.f;float u=std::clamp(t/1.2f,0.f,1.f);morph_=u*u*(3-2*u);time_=std::max(0.f,t-1.2f);
  // Coffee loops every 2*pi seconds after the intro, including head yaw and steam.
- if(scene_==Scene::Coffee)time_=std::fmod(time_,2*pi);
+ if(scene_==Scene::Coffee||scene_==Scene::Printer)time_=std::fmod(time_,2*pi);
  float m=morph_,s=std::sin(time_*2),beat=std::sin(time_*5);
- yaw_=m*(.25f+.12f*std::sin(time_*(scene_==Scene::Coffee?1.f:.9f)));pitch_=m*-.08f;shift_=0;bob_=m*s*2;
+ yaw_=m*(.25f+.12f*std::sin(time_*((scene_==Scene::Coffee||scene_==Scene::Printer)?1.f:.9f)));pitch_=m*-.08f;shift_=0;bob_=m*s*2;
  if(scene_==Scene::Fly||scene_==Scene::PaperPlane)yaw_=m*std::sin(time_*1.7f)*.45f;
  if(scene_==Scene::Nap)pitch_=m*(.12f+.22f*(s+1));
  if(scene_==Scene::Music||scene_==Scene::Dance){bob_=m*beat*4;pitch_+=m*beat*.08f;}
@@ -313,7 +325,7 @@ void SceneView::Rasterize(){
   if(dx*dx+dy*dy>render_width_*render_width_/4.f)pixels_[y*render_width_+x]=0;}
 }
 void SceneView::Draw(lv_layer_t* layer){
- if(coffee_active_)return;
+ if(clip_active_)return;
  Rasterize();
  lv_area_t area;lv_obj_get_coords(root_,&area);
  lv_draw_image_dsc_t d;lv_draw_image_dsc_init(&d);d.src=&image_;d.scale_x=d.scale_y=256*render_divisor_;d.pivot={0,0};

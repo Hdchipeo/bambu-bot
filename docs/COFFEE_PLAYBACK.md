@@ -29,7 +29,9 @@ live mesh rendering in code, call `SceneView::EnableCoffeePlayback(false)`.
 - Cropped rectangle: **167×129**, at **(67,56)**; no full-screen frame transfer.
 - 300 stored frames (150 per theme), RGB565 palettes with PackBits indices.
 - Flash data including palettes and frame offsets: **683,154 bytes (~667 KiB)**.
-- Two persistent RGB565 decoded buffers: **86,172 bytes (~84 KiB) additional RAM**.
+- The first Coffee-only version used **86,172 bytes (~84 KiB)** for its two decoded buffers.
+  Since Studio 0.3.5, Coffee shares buffers with Printer check: **112,000 bytes (~109 KiB)**
+  reserved for the larger clip after both buffers are used.
   The other scenes' existing mesh/raster buffers remain allocated.
 - ESP32 configuration routes large allocations to PSRAM. LCD uses two internal
   280×20 RGB565 DMA buffers; enabling the second adds **11,200 bytes internal RAM**.

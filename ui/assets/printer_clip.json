@@ -1,0 +1,16 @@
+{
+  "format": "palette RGB565 + PackBits indices",
+  "width": 200,
+  "height": 140,
+  "x": 46,
+  "y": 56,
+  "themes": 2,
+  "frames_per_theme": 88,
+  "intro_frames": 24,
+  "loop_frames": 64,
+  "frame_ms": 50,
+  "flash_bytes": 423255,
+  "double_buffer_bytes": 112000,
+  "max_palette_channel_error": 8.1,
+  "decoded_index_sha256": "a365c9ab13f8e41afb1dd01e4b04d1b29eea51138973e3176344b7b9a5e96a3c"
+}
