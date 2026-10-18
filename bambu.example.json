@@ -4,5 +4,8 @@
   "serial": "",
   "access_code": "",
   "ca_file": "printer-ca.pem",
-  "ota_url": ""
+  "ota_url": "",
+  "voice_notifications": true,
+  "wiki_url": "",
+  "wiki_token": ""
 }

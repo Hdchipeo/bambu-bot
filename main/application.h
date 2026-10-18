@@ -12,6 +12,7 @@
 #include <memory>
 
 #include "protocol.h"
+#include "bambu/voice_prompt.h"
 #include "ota.h"
 #include "audio_service.h"
 #include "device_state.h"
@@ -31,6 +32,7 @@
 #define MAIN_EVENT_START_LISTENING      (1 << 10)
 #define MAIN_EVENT_STOP_LISTENING       (1 << 11)
 #define MAIN_EVENT_STATE_CHANGED        (1 << 12)
+#define MAIN_EVENT_PROACTIVE_TICK       (1 << 13)
 
 
 enum AecMode {
@@ -103,6 +105,8 @@ public:
      */
     void StopListening();
 
+    // Call on the application thread. Opens a normal ASR session with prerecorded Opus.
+    bool TryProactiveVoice(const std::string& asset);
     void Reboot();
     void WakeWordInvoke(const std::string& wake_word);
     bool UpgradeFirmware(const std::string& url, const std::string& version = "");
@@ -135,6 +139,14 @@ private:
     std::string last_error_message_;
     AudioService audio_service_;
     std::unique_ptr<Ota> ota_;
+
+    bambu::VoicePrompt proactive_prompt_;
+    esp_timer_handle_t proactive_timer_=nullptr;
+    bool proactive_active_=false,proactive_sending_=false;
+    uint32_t proactive_timestamp_=0;
+    int64_t proactive_deadline_=0;
+    void TickProactiveVoice();
+    void CancelProactiveVoice(bool close_channel);
 
     bool has_server_time_ = false;
     bool aborted_ = false;

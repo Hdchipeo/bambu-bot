@@ -9,7 +9,7 @@
 [![ESP32-S3](https://img.shields.io/badge/Target-ESP32--S3-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-5.5.4-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://github.com/espressif/esp-idf)
 [![LVGL](https://img.shields.io/badge/UI-LVGL_9.5.0-00AE42?style=flat-square)](https://lvgl.io/)
-[![Firmware](https://img.shields.io/badge/Firmware-v0.4.0-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
+[![Firmware](https://img.shields.io/badge/Firmware-v0.5.0-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
 [![Host Tests](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml)
 [![Simulator](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
@@ -30,7 +30,7 @@
 
 **Bambu Bot** là robot chatbot để bàn giúp bạn theo dõi máy in **Bambu Lab A1**, hỏi trạng thái bản in bằng giọng nói và tương tác với một đầu robot có biểu cảm. Dự án kết hợp nền hội thoại [XiaoZhi](https://github.com/78/xiaozhi-esp32), giao diện **LVGL** và dữ liệu máy in qua **MQTT TLS trong mạng LAN**.
 
-Bản mẫu hiện dùng phần cứng **Desk-bot ESP32-S3 + LCD 280×240**. **Emotion Studio trên macOS** dùng chung mã UI để thử bố cục, theme và animation trước khi nạp lên thiết bị. Tra cứu Bambu Wiki, hỗ trợ xử lý sự cố bằng RAG, màn AMOLED và chuyển động servo nằm trong lộ trình phát triển.
+Bản mẫu hiện dùng phần cứng **Desk-bot ESP32-S3 + LCD 280×240**. **Emotion Studio trên macOS** dùng chung mã UI để thử bố cục, theme và animation trước khi nạp lên thiết bị. Firmware **0.5.0** bổ sung thông báo chủ động qua giọng nói mô phỏng, giải mã HMS và tra cứu Bambu Wiki qua MCP/RAG trên Mac. Màn AMOLED và chuyển động servo nằm trong lộ trình phát triển.
 
 <a id="features"></a>
 
@@ -44,7 +44,8 @@ Bản mẫu hiện dùng phần cứng **Desk-bot ESP32-S3 + LCD 280×240**. **E
 | **Emotion Studio** | LVGL 9.5.0 + SDL2; màn chữ nhật 280×240 và màn tròn 466×466 | Màn tròn trong simulator dùng renderer CPU |
 | **Giao diện máy in** | Icon máy in, đầu phun, bàn nhiệt và tiến độ; màu xanh `#00AE42` | HUD LVGL độc lập với animation, cập nhật theo telemetry |
 | **Công cụ MCP** | `self.bambu.get_printer_status` để trợ lý đọc trạng thái | Server/model AI cần hỗ trợ gọi công cụ |
-| **Thông báo sự kiện** | Popup và âm báo khi hoàn tất hoặc có `print_error` mới | Chưa có thông báo giọng nói chủ động hay giải mã HMS |
+| **Thông báo sự kiện** | Giọng nói chủ động khi bắt đầu/hoàn tất/lỗi, dùng Opus mô phỏng theo cơ chế Smart-lamp; popup/âm báo dự phòng | Chờ trợ lý Idle, chống lặp/huỷ thông báo cũ; chưa kiểm tra ASR/TTS trên thiết bị ở bản mới |
+| **HMS & Wiki RAG** | Giải mã HMS, tra catalog lỗi chính thức và Wiki cục bộ qua MCP | Backend SQLite FTS5 trên Mac; cần cấu hình và prompt trợ lý, chưa có embedding/reranker |
 | **Kiểm soát dữ liệu cũ** | Gộp bản tin từng phần, theo dõi tuổi từng trường, chống hoàn tất giả sau reconnect | Chưa lưu chống lặp sự kiện qua reboot |
 
 <a id="studio"></a>
@@ -128,6 +129,8 @@ Sau khi nạp, thiết lập Wi-Fi theo luồng XiaoZhi và hoàn tất kích ho
 | Nhấn giữ **BOOT** | Đổi theme; lưu lựa chọn qua khởi động lại |
 | MCP `self.screen.set_theme` | `dark`: đen/xanh · `light`: xanh/trắng |
 
+Thông báo giọng nói và Wiki RAG cần thêm [cấu hình backend/prompt trợ lý](docs/VOICE_HMS_RAG.md).
+
 Muốn hội thoại tiếng Việt, chọn ngôn ngữ ASR, TTS và prompt trợ lý trên server. Ngôn ngữ giao diện không tự thay cấu hình giọng nói.
 
 ### Custom wake word
@@ -183,9 +186,10 @@ LCD **280×240** dùng frame dựng sẵn thay cho dựng hình 3D mỗi frame t
 | :--- | :--- |
 | **Bank animation v3** | **3.602.446 byte**, 32 clip × 2 theme, 5.756 tham chiếu frame |
 | **Hai buffer RGB565 dùng chung** | **136.160 byte**, không tăng theo số cảnh |
+| **Ba câu thoại mô phỏng** | **90.222 byte** trong assets, Opus 16 kHz / 60 ms |
 | **Scratch giải mã palette** | **34.886 byte**, dùng lại giữa các frame |
-| **Assets với custom wake word + MN7 English** | **7.284.197 byte**, còn **1.104.411 byte** trong phân vùng 8 MiB |
-| **App cùng cấu hình MN7** | **0x354250 byte**, còn **15%** slot ứng dụng |
+| **Assets với custom wake word + MN7 English** | **7.374.642 byte**, còn **1.013.966 byte** trong phân vùng 8 MiB |
+| **App cùng cấu hình MN7** | **0x358e70 byte**, còn **15%** slot ứng dụng |
 | **Nhịp phát mục tiêu** | **50 ms/frame → 20 FPS**; chưa đo FPS LCD khi chạy đồng thời MN7 |
 | **Dự phòng** | Thiếu/hỏng bank → renderer CPU 140×120, target 100 ms/frame |
 
@@ -212,6 +216,9 @@ Có thể thử với dịch vụ discovery mặc định của XiaoZhi hoặc t
 | Công cụ MCP | Vai trò |
 | :--- | :--- |
 | `self.bambu.get_printer_status` | Đọc trạng thái máy in cho trợ lý AI |
+| `self.bambu.get_notification_context` | Đọc sự kiện vừa kích hoạt thông báo |
+| `self.bambu.get_hms_diagnostics` | Đọc HMS/print_error và tra mô tả lỗi, nguồn Wiki |
+| `self.bambu.search_wiki` | Tìm đoạn hướng dẫn Wiki theo câu hỏi hoặc mã HMS |
 | `self.screen.set_theme` | Chuyển hai theme của Bambu Bot |
 | `self.screen.set_brightness` | Chỉnh độ sáng màn hình |
 | `self.audio_speaker.set_volume` | Chỉnh âm lượng loa |
@@ -251,6 +258,7 @@ bambu-bot/
 │   ├── animation_assets/       # Bank frame dựng sẵn cho LCD 280×240
 │   └── assets/                 # Manifest và tài nguyên UI
 ├── simulator/                  # Emotion Studio trên macOS / SDL2
+├── server/                     # HMS + Wiki retrieval trên Mac (SQLite FTS5)
 ├── scripts/                    # Cấu hình, tạo assets, kiểm tra và đóng gói
 ├── tests/                      # Kiểm thử parser, cấu hình và codec
 ├── partitions/                 # Bảng phân vùng ESP-IDF
@@ -265,7 +273,8 @@ bambu-bot/
 - [x] Đầu robot 3D: 18 kịch bản + 14 biểu cảm, bank v3 vừa flash cùng MN7.
 - [x] Popup/âm báo hoàn tất hoặc lỗi máy in.
 - [ ] Đo FPS, tải CPU/RAM và độ ổn định khi animation + voice + MQTT cùng chạy.
-- [ ] Thông báo chủ động bằng giọng nói, giải mã HMS và tra cứu Bambu Wiki bằng RAG.
+- [x] Thông báo chủ động bằng Opus mô phỏng, giải mã HMS và Wiki RAG qua MCP trên Mac.
+- [ ] Kiểm tra ASR/TTS và thông báo bắt đầu/hoàn tất/lỗi trên Desk-bot với firmware 0.5.0.
 - [ ] Tích hợp AMOLED tròn 1.75 và servo hai trục trên phần cứng hoàn chỉnh.
 - [ ] Lưu chống lặp sự kiện qua reboot và kiểm thử chạy dài.
 
@@ -276,6 +285,7 @@ bambu-bot/
 | Tài liệu | Nội dung |
 | :--- | :--- |
 | [Emotion Studio](docs/UI_STUDIO.md) | Chạy simulator, chọn màn hình, emotion và theme |
+| [Voice, HMS & Wiki RAG](docs/VOICE_HMS_RAG.md) | Cơ chế Opus, chính sách thông báo, backend Mac và prompt MCP |
 | [Animation bank](docs/ANIMATION_BANK.md) | Preview, codec v3, ngân sách bộ nhớ và chọn MultiNet |
 | [Thử nghiệm & kiểm chứng](docs/TESTING.md) | Kết nối, prompt MCP, dữ liệu demo/live/stale |
 | [Nguồn upstream](docs/UPSTREAM.md) | Nguồn mã, nguồn định nghĩa phần cứng |

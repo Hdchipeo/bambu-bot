@@ -80,12 +80,18 @@ void BambuDisplay::Refresh() {
     if (!scene_) return;
     using bambu::ui::Emotion;
     const auto device = Application::GetInstance().GetDeviceState();
+    bool hms_error=false,hms_warning=false;
+    if(printer_.hms.value)for(const auto& fault:*printer_.hms.value){
+        hms_error|=(fault.code>>16)==1 || (fault.code>>16)==2;
+        hms_warning|=(fault.code>>16)==3;
+    }
     Emotion emotion = requested_;
     if (sleeping_) emotion = Emotion::Sleepy;
-    else if (device == kDeviceStateFatalError || printer_.error.value.value_or(0) != 0) emotion = Emotion::Error;
+    else if (device == kDeviceStateFatalError || (printer_.error.value.value_or(0) != 0 || hms_error)) emotion = Emotion::Error;
     else if (device == kDeviceStateListening) emotion = Emotion::Listening;
     else if (device == kDeviceStateSpeaking) emotion = requested_ == Emotion::Idle ? Emotion::Speaking : requested_;
     else if (device == kDeviceStateConnecting) emotion = Emotion::Thinking;
+    else if(hms_warning && emotion==Emotion::Idle)emotion=Emotion::Warning;
     else if (emotion == Emotion::Idle) {
         if (!printer_.connected) emotion = Emotion::Offline;
         else if (!printer_.state.value) emotion = Emotion::Warning;
@@ -124,7 +130,7 @@ void BambuDisplay::Refresh() {
     if(emotion==Emotion::Idle && active_emotion_!=Emotion::Idle)idle_started_=now;
     active_emotion_=emotion;
     const auto printer_state=printer_.state.value.value_or("");
-    const bool printer_visual=emotion==Emotion::Error ? printer_.error.value.value_or(0)!=0||printer_state=="FAILED" :
+    const bool printer_visual=emotion==Emotion::Error ? printer_.error.value.value_or(0)!=0||hms_error||printer_state=="FAILED" :
         emotion==Emotion::Completed ? printer_state=="FINISH" :
         emotion==Emotion::Printing ? printer_state=="RUNNING"||printer_state=="PREPARE" :
         emotion==Emotion::Warning && printer_state=="PAUSE";

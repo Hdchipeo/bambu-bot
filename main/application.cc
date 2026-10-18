@@ -44,6 +44,13 @@ Application::Application() {
         .skip_unhandled_events = true
     };
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
+    esp_timer_create_args_t prompt_timer{};
+    prompt_timer.callback=[](void* arg){
+        auto app=static_cast<Application*>(arg);
+        xEventGroupSetBits(app->event_group_,MAIN_EVENT_PROACTIVE_TICK);
+    };
+    prompt_timer.arg=this;prompt_timer.name="bambu_voice";prompt_timer.skip_unhandled_events=true;
+    ESP_ERROR_CHECK(esp_timer_create(&prompt_timer,&proactive_timer_));
 }
 
 Application::~Application() {
@@ -51,6 +58,7 @@ Application::~Application() {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
     }
+    if(proactive_timer_){esp_timer_stop(proactive_timer_);esp_timer_delete(proactive_timer_);}
     vEventGroupDelete(event_group_);
 }
 
@@ -179,11 +187,18 @@ void Application::Run() {
         MAIN_EVENT_START_LISTENING |
         MAIN_EVENT_STOP_LISTENING |
         MAIN_EVENT_ACTIVATION_DONE |
-        MAIN_EVENT_STATE_CHANGED;
+        MAIN_EVENT_STATE_CHANGED | MAIN_EVENT_PROACTIVE_TICK;
 
     while (true) {
         auto bits = xEventGroupWaitBits(event_group_, ALL_EVENTS, pdTRUE, pdFALSE, portMAX_DELAY);
 
+        if(proactive_active_ && (bits & (MAIN_EVENT_ERROR|MAIN_EVENT_NETWORK_DISCONNECTED|MAIN_EVENT_TOGGLE_CHAT|
+                                         MAIN_EVENT_START_LISTENING|MAIN_EVENT_STOP_LISTENING|MAIN_EVENT_WAKE_WORD_DETECTED))){
+            if(protocol_)protocol_->SendAbortSpeaking(kAbortReasonNone);
+            CancelProactiveVoice(false);
+            SetDeviceState(kDeviceStateIdle);
+        }
+        if(bits & MAIN_EVENT_PROACTIVE_TICK)TickProactiveVoice();
         if (bits & MAIN_EVENT_ERROR) {
             SetDeviceState(kDeviceStateIdle);
             Alert(Lang::Strings::ERROR, last_error_message_.c_str(), "circle_xmark", Lang::Sounds::OGG_EXCLAMATION);
@@ -219,6 +234,7 @@ void Application::Run() {
 
         if (bits & MAIN_EVENT_SEND_AUDIO) {
             while (auto packet = audio_service_.PopPacketFromSendQueue()) {
+                if(proactive_active_)continue; // No live microphone data in the synthetic ASR session.
                 if (protocol_ && !protocol_->SendAudio(std::move(packet))) {
                     break;
                 }
@@ -512,6 +528,7 @@ void Application::InitializeProtocol() {
         board.SetPowerSaveLevel(PowerSaveLevel::LOW_POWER);
         Schedule([this]() {
             auto display = Board::GetInstance().GetDisplay();
+            CancelProactiveVoice(false);
             display->SetChatMessage("system", "");
             SetDeviceState(kDeviceStateIdle);
         });
@@ -525,11 +542,13 @@ void Application::InitializeProtocol() {
             if (strcmp(state->valuestring, "start") == 0) {
                 Schedule([this]() {
                     aborted_ = false;
+                    if(proactive_active_){proactive_sending_=false;proactive_prompt_.Clear();proactive_deadline_=esp_timer_get_time()/1000+90000;}
                     SetDeviceState(kDeviceStateSpeaking);
                 });
             } else if (strcmp(state->valuestring, "stop") == 0) {
                 Schedule([this]() {
                     if (GetDeviceState() == kDeviceStateSpeaking) {
+                        if(proactive_active_)CancelProactiveVoice(false);
                         if (listening_mode_ == kListeningModeManualStop) {
                             SetDeviceState(kDeviceStateIdle);
                         } else {
@@ -875,6 +894,12 @@ void Application::HandleStateChangedEvent() {
             display->SetStatus(Lang::Strings::LISTENING);
             display->SetEmotion("neutral");
 
+            if(proactive_active_){
+                // The prerecorded voice is sent by the timer, never mixed with the mic.
+                audio_service_.EnableVoiceProcessing(false);
+                audio_service_.EnableWakeWordDetection(false);
+                break;
+            }
             // Make sure the audio processor is running
             if (play_popup_on_listening_ || !audio_service_.IsAudioProcessorRunning()) {
                 // For auto mode, wait for playback queue to be empty before enabling voice processing
@@ -1046,7 +1071,7 @@ void Application::WakeWordInvoke(const std::string& wake_word) {
 }
 
 bool Application::CanEnterSleepMode() {
-    if (GetDeviceState() != kDeviceStateIdle) {
+    if (GetDeviceState() != kDeviceStateIdle || proactive_active_) {
         return false;
     }
 
@@ -1104,6 +1129,7 @@ void Application::PlaySound(const std::string_view& sound) {
 
 void Application::ResetProtocol() {
     Schedule([this]() {
+        CancelProactiveVoice(false);
         // Close audio channel if opened
         if (protocol_ && protocol_->IsAudioChannelOpened()) {
             protocol_->CloseAudioChannel();
@@ -1113,3 +1139,60 @@ void Application::ResetProtocol() {
     });
 }
 
+
+
+bool Application::TryProactiveVoice(const std::string& asset) {
+    if(proactive_active_ || !protocol_ || GetDeviceState()!=kDeviceStateIdle || !audio_service_.IsIdle())return false;
+    void* data=nullptr;size_t bytes=0;
+    if(!Assets::GetInstance().GetAssetData(asset,data,bytes) ||
+       !proactive_prompt_.Load(static_cast<const uint8_t*>(data),bytes)){
+        ESP_LOGW(TAG,"Notification audio unavailable: %s",asset.c_str());return false;
+    }
+    proactive_active_=true;proactive_sending_=false;proactive_timestamp_=0;
+    audio_service_.EnableVoiceProcessing(false);audio_service_.EnableWakeWordDetection(false);
+    SetDeviceState(kDeviceStateConnecting);
+    Schedule([this](){
+        if(!proactive_active_ || !protocol_ || GetDeviceState()!=kDeviceStateConnecting)return;
+        if(!protocol_->IsAudioChannelOpened() && !protocol_->OpenAudioChannel()){
+            CancelProactiveVoice(true);return;
+        }
+        if(!proactive_active_)return;
+        listening_mode_=kListeningModeManualStop;
+        protocol_->SendStartListening(kListeningModeManualStop);
+        proactive_sending_=true;proactive_deadline_=esp_timer_get_time()/1000+60000;
+        SetDeviceState(kDeviceStateListening);
+        esp_timer_start_periodic(proactive_timer_,60000);
+        ESP_LOGI(TAG,"Proactive ASR stream started: %u packets",unsigned(proactive_prompt_.Remaining()));
+    });
+    return true;
+}
+
+void Application::TickProactiveVoice(){
+    if(!proactive_active_)return;
+    if(!protocol_ || !protocol_->IsAudioChannelOpened() || esp_timer_get_time()/1000>proactive_deadline_){
+        ESP_LOGW(TAG,"Proactive voice channel failed or timed out");CancelProactiveVoice(true);return;
+    }
+    if(!proactive_sending_)return;
+    const uint8_t* data=nullptr;size_t bytes=0;
+    if(proactive_prompt_.Next(data,bytes)){
+        auto packet=std::make_unique<AudioStreamPacket>();
+        packet->sample_rate=16000;packet->frame_duration=60;packet->timestamp=proactive_timestamp_;
+        packet->payload.assign(data,data+bytes);proactive_timestamp_+=60;
+        if(!protocol_->SendAudio(std::move(packet))){CancelProactiveVoice(true);return;}
+    }else{
+        protocol_->SendStopListening();proactive_sending_=false;proactive_prompt_.Clear();
+        proactive_deadline_=esp_timer_get_time()/1000+30000;
+        ESP_LOGI(TAG,"Proactive ASR stream sent; awaiting server TTS");
+    }
+}
+
+void Application::CancelProactiveVoice(bool close_channel){
+    if(!proactive_active_)return;
+    esp_timer_stop(proactive_timer_);
+    if(protocol_ && proactive_sending_)protocol_->SendStopListening();
+    proactive_active_=false;proactive_sending_=false;proactive_prompt_.Clear();
+    if(close_channel){
+        if(protocol_){protocol_->SendAbortSpeaking(kAbortReasonNone);protocol_->CloseAudioChannel();}
+        SetDeviceState(kDeviceStateIdle);
+    }
+}

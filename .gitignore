@@ -30,3 +30,5 @@ simulator/build-asan/
 build-coffee-demo/
 build-printer-demo/
 build-all-demo/
+
+server/data/

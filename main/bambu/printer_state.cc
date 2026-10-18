@@ -1,6 +1,7 @@
 #include "printer_state.h"
 
 #include <cmath>
+#include <algorithm>
 #include <cstdio>
 #include <limits>
 #include <type_traits>
@@ -28,6 +29,11 @@ bool Text(const cJSON* obj, const char* key, Field<std::string>& out, int64_t no
     if (!cJSON_IsString(n) || !n->valuestring || std::char_traits<char>::length(n->valuestring) > 256) return false;
     out = {std::string(n->valuestring), now};
     return true;
+}
+bool Unsigned(const cJSON* value,uint32_t& result) {
+    if(!cJSON_IsNumber(value) || !std::isfinite(value->valuedouble) || value->valuedouble<0 ||
+       value->valuedouble>std::numeric_limits<uint32_t>::max() || std::floor(value->valuedouble)!=value->valuedouble)return false;
+    result=static_cast<uint32_t>(value->valuedouble);return true;
 }
 template<typename T> void Add(cJSON* root, const char* name, const Field<T>& f, int64_t now) {
     if (f.value) {
@@ -103,6 +109,21 @@ bool PrinterState::Apply(const std::string& payload, int64_t now) {
         snapshot_.error = {code, now};
         changed = true;
     }
+    const auto hms=Get(p,"hms");
+    if(cJSON_IsArray(hms) && cJSON_GetArraySize(hms)<=32){
+        std::vector<HmsFault> faults;bool valid=true;
+        for(const cJSON* item=hms->child;item;item=item->next){
+            HmsFault fault;
+            if(!cJSON_IsObject(item) || !Unsigned(Get(item,"attr"),fault.attr) || !Unsigned(Get(item,"code"),fault.code)){
+                valid=false;break;
+            }
+            faults.push_back(fault);
+        }
+        if(valid){
+            std::sort(faults.begin(),faults.end());faults.erase(std::unique(faults.begin(),faults.end()),faults.end());
+            snapshot_.hms={std::move(faults),now};changed=true;
+        }
+    }
     if (state_changed) {
         const auto& state = *snapshot_.state.value;
         // A fresh observed RUNNING is required; a FINISH snapshot alone is insufficient.
@@ -131,6 +152,23 @@ std::string PrinterState::ToJson(int64_t now) const {
     Add(root, "nozzle_c", snapshot_.nozzle, now);
     Add(root, "bed_c", snapshot_.bed, now);
     Add(root, "print_error", snapshot_.error, now);
+    auto faults=cJSON_AddArrayToObject(root,"hms");
+    if(snapshot_.hms.value)for(const auto& fault:*snapshot_.hms.value){
+        auto item=cJSON_CreateObject();cJSON_AddItemToArray(faults,item);
+        cJSON_AddStringToObject(item,"code",fault.DisplayCode().c_str());
+        cJSON_AddStringToObject(item,"key",fault.Key().c_str());
+        cJSON_AddStringToObject(item,"severity",fault.Severity());
+        cJSON_AddNumberToObject(item,"attr",fault.attr);cJSON_AddNumberToObject(item,"raw_code",fault.code);
+        cJSON_AddNumberToObject(item,"module_id",fault.attr>>24);
+        cJSON_AddNumberToObject(item,"module_number",(fault.attr>>16)&255);
+        cJSON_AddNumberToObject(item,"part_id",(fault.attr>>8)&255);
+        cJSON_AddNumberToObject(item,"message_id",fault.code&65535);
+    }
+    auto hms_meta=cJSON_AddObjectToObject(root,"hms_meta");
+    cJSON_AddBoolToObject(hms_meta,"known",snapshot_.hms.value.has_value());
+    cJSON_AddBoolToObject(hms_meta,"stale",!snapshot_.connected || !Fresh(snapshot_.hms.updated_ms,now));
+    if(snapshot_.hms.updated_ms>=0)cJSON_AddNumberToObject(hms_meta,"age_ms",now-snapshot_.hms.updated_ms);
+    else cJSON_AddNullToObject(hms_meta,"age_ms");
     char* json = cJSON_PrintUnformatted(root);
     std::string result = json ? json : "{}";
     cJSON_free(json);
@@ -145,7 +183,7 @@ Snapshot PrinterState::GetFreshSnapshot(int64_t now) const {
         if (!copy.connected || !Fresh(field.updated_ms, now)) field.value.reset();
     };
     expire(copy.state); expire(copy.job); expire(copy.progress); expire(copy.remaining);
-    expire(copy.nozzle); expire(copy.bed); expire(copy.error);
+    expire(copy.nozzle); expire(copy.bed); expire(copy.error); expire(copy.hms);
     return copy;
 }
 

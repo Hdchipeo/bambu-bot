@@ -1,0 +1,35 @@
+{
+  "start": {
+    "file": "notify_start.bbv",
+    "text": "Máy in vừa bắt đầu in. Hãy đọc ngữ cảnh thông báo và trạng thái máy in bằng công cụ, rồi thông báo cho tôi tiến độ và thời gian còn lại. Nếu không có dữ liệu thì nói rõ chưa biết.",
+    "voice": "macOS Linh vi_VN",
+    "sample_rate": 16000,
+    "frame_ms": 60,
+    "packets": 221,
+    "duration_ms": 13260,
+    "bytes": 29884,
+    "sha256": "8df0f1f8271888cf90c7b4dd6363fd352a943aa9d361a19149c4147104c460b8"
+  },
+  "finish": {
+    "file": "notify_finish.bbv",
+    "text": "Bản in vừa hoàn thành. Hãy đọc ngữ cảnh thông báo và trạng thái máy in bằng công cụ, rồi báo tin cho tôi. Chỉ xác nhận hoàn tất khi dữ liệu máy in xác nhận.",
+    "voice": "macOS Linh vi_VN",
+    "sample_rate": 16000,
+    "frame_ms": 60,
+    "packets": 196,
+    "duration_ms": 11760,
+    "bytes": 26270,
+    "sha256": "92ac50179200799d93e126a3f491fd5ed9f0604343cef2bd6a6d3a7bbeeca7a5"
+  },
+  "error": {
+    "file": "notify_error.bbv",
+    "text": "Máy in có cảnh báo mới. Hãy đọc ngữ cảnh thông báo, trạng thái máy in và chẩn đoán HMS bằng công cụ. Tra cứu Bambu Wiki để giải thích lỗi và cách khắc phục, kèm nguồn. Nếu chưa rõ thì không đoán.",
+    "voice": "macOS Linh vi_VN",
+    "sample_rate": 16000,
+    "frame_ms": 60,
+    "packets": 256,
+    "duration_ms": 15360,
+    "bytes": 34068,
+    "sha256": "a5a586859addd7217f9f47329fabaade95578a0955f97d3cd078bcd903dfa930"
+  }
+}

@@ -78,5 +78,19 @@ int main() {
     assert(s.TakeEvents().empty());
     Json next_job(s.ToJson(42000));
     assert(cJSON_IsNull(next_job.get("progress_pct")));
+    assert(s.Apply(R"({"print":{"hms":[{"attr":50331904,"code":65543}]}})",43000));
+    auto h=s.GetFreshSnapshot(43000);assert(h.hms.value && h.hms.value->size()==1);
+    assert((*h.hms.value)[0].Key()=="0300010000010007");
+    assert(!s.Apply(R"({"print":{"hms":[{"attr":-1,"code":65543}]}})",43001));
+    assert(s.GetFreshSnapshot(43001).hms.value->size()==1);
+    assert(s.Apply(R"({"print":{"nozzle_temper":220}})",43002));
+    assert(s.GetFreshSnapshot(43002).hms.value->size()==1); // Partial telemetry preserves faults.
+    assert(!s.GetFreshSnapshot(73001).hms.value);
+    assert(s.Apply(R"({"print":{"hms":[]}})",73002));assert(s.GetFreshSnapshot(73002).hms.value->empty());
+    Json known_empty(s.ToJson(73002));
+    assert(cJSON_IsTrue(cJSON_GetObjectItem(known_empty.get("hms_meta"),"known")));
+    assert(s.Apply(R"({"print":{"hms":[{"attr":1,"code":65537},{"attr":1,"code":65537}]}})",73003));
+    assert(s.GetFreshSnapshot(73003).hms.value->size()==1);
+    s.SetConnection(false);assert(!s.GetFreshSnapshot(73004).hms.value);
     std::cout << "PASS: parser, partial updates, field freshness, reconnect, completion, error dedup and job isolation\n";
 }

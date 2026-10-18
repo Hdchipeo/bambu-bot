@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include "hms.h"
 
 namespace bambu {
 template <typename T> struct Field {
@@ -22,6 +23,7 @@ struct Snapshot {
     Field<double> nozzle;
     Field<double> bed;
     Field<uint32_t> error;
+    Field<std::vector<HmsFault>> hms;
 };
 
 // ESP-independent: host tests exercise the same parser/event logic as firmware.

@@ -1,4 +1,8 @@
-# Bộ animation 0.4.0 — 18 kịch bản và 14 biểu cảm 3D
+# Bộ animation — 18 kịch bản và 14 biểu cảm 3D
+
+Firmware **0.5.0** thêm [thông báo Opus và Wiki RAG](VOICE_HMS_RAG.md); ba clip
+âm thanh thêm 90.222 byte vào assets. Các số build 0.4.x bên dưới là mốc trước
+khi thêm âm thanh, không phải tổng dung lượng firmware 0.5.0.
 
 ![Một số kịch bản](ui/all-scenes-gallery.gif)
 

@@ -39,7 +39,7 @@ set(SOURCES "audio/audio_codec.cc"
             "main.cc"
             )
 
-list(APPEND SOURCES "bambu/printer_state.cc" "bambu/bambu_service.cc")
+list(APPEND SOURCES "bambu/printer_state.cc" "bambu/bambu_service.cc" "bambu/hms.cc" "bambu/notifications.cc" "bambu/voice_prompt.cc" "bambu/knowledge_client.cc")
 
 set(INCLUDE_DIRS "." "display" "display/lvgl_display" "display/lvgl_display/jpg" "audio" "audio/demuxer" "protocols")
 
@@ -1105,7 +1105,7 @@ function(build_default_assets_bin)
 
     set(BAMBU_ANIMATION_DEPENDENCY "")
     if(BOARD_TYPE STREQUAL "bambu-deskbot")
-        set(BAMBU_ANIMATION_DEPENDENCY "${PROJECT_DIR}/ui/animation_assets/animations.bba")
+        file(GLOB BAMBU_ANIMATION_DEPENDENCY CONFIGURE_DEPENDS "${PROJECT_DIR}/ui/animation_assets/*.bba" "${PROJECT_DIR}/ui/animation_assets/*.bbv")
     endif()
     # Create custom command to build assets
     add_custom_command(

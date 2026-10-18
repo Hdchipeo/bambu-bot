@@ -31,3 +31,13 @@ class ConfigureTests(unittest.TestCase):
     def test_unknown_keys_rejected(self):
         with self.assertRaises(ValueError):
             configure.generate({"servo_gpio": 18}, Path("."))
+
+    def test_notification_and_wiki_options(self):
+        result=configure.generate({"voice_notifications":False,"wiki_url":"http://192.168.1.9:8765/","wiki_token":"local-test"},Path("."))
+        self.assertIn("#define BAMBU_VOICE_NOTIFICATIONS false",result)
+        self.assertIn('BAMBU_WIKI_URL "http://192.168.1.9:8765"',result)
+    def test_wiki_credentials_and_public_http_rejected(self):
+        for data in [{"voice_notifications":"true"},{"wiki_url":"http://192.168.1.9:8765"},
+                     {"wiki_url":"http://8.8.8.8","wiki_token":"test"},{"wiki_url":"https://user:pass@example.com"},
+                     {"wiki_token":"bad\r\nheader"}]:
+            with self.assertRaises(ValueError):configure.generate(data,Path("."))
