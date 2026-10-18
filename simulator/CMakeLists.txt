@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(BambuBotStudio VERSION 0.3.3 LANGUAGES C CXX ASM)
+project(BambuBotStudio VERSION 0.3.4 LANGUAGES C CXX ASM)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,7 +34,7 @@ target_compile_definitions(bambu_lvgl PUBLIC
     LV_KCONFIG_IGNORE LV_LVGL_H_INCLUDE_SIMPLE)
 target_compile_options(bambu_lvgl PRIVATE -Wno-deprecated-declarations)
 
-add_library(bambu_face STATIC ../ui/bambu_face.cc ../ui/scene3d.cc)
+add_library(bambu_face STATIC ../ui/bambu_face.cc ../ui/scene3d.cc ../ui/coffee_clip.cc)
 target_include_directories(bambu_face PUBLIC ../ui)
 target_link_libraries(bambu_face PUBLIC bambu_lvgl)
 target_compile_options(bambu_face PRIVATE -Wall -Wextra -Werror)

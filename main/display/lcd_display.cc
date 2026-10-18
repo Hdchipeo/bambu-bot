@@ -139,7 +139,11 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
         .panel_handle = panel_,
         .control_handle = nullptr,
         .buffer_size = static_cast<uint32_t>(width_ * 20),
+#if defined(CONFIG_BOARD_TYPE_BREAD_COMPACT_WIFI_LCD)
+        .double_buffer = true, // Desk-bot: overlap LVGL RGB565 drawing with SPI DMA.
+#else
         .double_buffer = false,
+#endif
         .trans_size = 0,
         .hres = static_cast<uint32_t>(width_),
         .vres = static_cast<uint32_t>(height_),

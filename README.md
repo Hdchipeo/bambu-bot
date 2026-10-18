@@ -93,3 +93,10 @@ Host test biên dịch chính parser firmware với AddressSanitizer/UndefinedBe
 - [Thiết kế sản phẩm đầy đủ](docs/PROJECT_PLAN.md) — phần kiến trúc mục tiêu, gồm AMOLED, Wiki và servo ở các giai đoạn sau.
 
 Tham khảo giao thức/trạng thái từ [PrintSphere](https://github.com/cptkirki/PrintSphere). Client A1 trong bản này được viết riêng; không chép mã PrintSphere. Nếu tích hợp mã upstream đó về sau, cần tuân theo [giấy phép FNCL v1.1](https://github.com/cptkirki/PrintSphere/blob/main/LICENSE).
+
+### Coffee animation playback experiment
+
+The 280×240 coffee scene now uses pre-rendered 3D frames and native LVGL telemetry,
+with a 20 FPS target. Try `./scripts/run_simulator.sh --coffee-demo`.
+See [the experiment and preview](docs/COFFEE_PLAYBACK.md) for the isolated demo
+firmware profile, memory budget and verification limits.

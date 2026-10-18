@@ -1,4 +1,5 @@
 #include "scene3d.h"
+#include <cstring>
 #include <src/misc/cache/instance/lv_image_cache.h>
 #include <algorithm>
 #include <cmath>
@@ -35,6 +36,7 @@ uint32_t Shade(uint32_t c,float f) {
 }
 const SceneInfo& DescribeScene(Scene s) { auto i=static_cast<size_t>(s);return info[i<info.size()?i:0]; }
 SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round,int render_divisor,uint32_t frame_period_ms):width_(w),height_(h) {
+ frame_period_ms_=std::max<uint32_t>(33,frame_period_ms);
  scale_=std::min(w/320.f,h/320.f);round_=round;
  render_divisor_=std::clamp(render_divisor,1,2);
  render_width_=w/render_divisor_;render_height_=h/render_divisor_;
@@ -47,6 +49,8 @@ SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round,int render_divisor,
  lv_obj_set_style_bg_opa(root_,LV_OPA_COVER,0);
  lv_obj_remove_flag(root_,static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_SCROLLABLE|LV_OBJ_FLAG_CLICKABLE));
  lv_obj_add_event_cb(root_,[](lv_event_t* e){static_cast<SceneView*>(lv_event_get_user_data(e))->Draw(lv_event_get_layer(e));},LV_EVENT_DRAW_MAIN,this);
+ coffee_image_=lv_image_create(root_);lv_obj_set_pos(coffee_image_,CoffeeClip::X(),CoffeeClip::Y());
+ lv_obj_add_flag(coffee_image_,LV_OBJ_FLAG_HIDDEN);lv_obj_remove_flag(coffee_image_,LV_OBJ_FLAG_CLICKABLE);
  title_=lv_label_create(root_);footer_=lv_label_create(root_);
  for(auto label:{title_,footer_}) {
   lv_obj_set_style_text_font(label,w<320?&lv_font_montserrat_12:&lv_font_montserrat_14,0);
@@ -60,7 +64,7 @@ SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round,int render_divisor,
   auto now=lv_tick_get();auto dt=now-self->last_tick_;self->last_tick_=now;self->RenderAt(self->elapsed_+dt);
  },std::max<uint32_t>(33,frame_period_ms),this);
 }
-SceneView::~SceneView(){if(timer_)lv_timer_delete(timer_);lv_image_cache_drop(&image_);printer_icon_.reset();lv_obj_delete(root_);}
+SceneView::~SceneView(){if(timer_)lv_timer_delete(timer_);for(auto& image:coffee_images_)lv_image_cache_drop(&image);lv_image_cache_drop(&image_);printer_icon_.reset();lv_obj_delete(root_);}
 void SceneView::SetScene(Scene scene){scene_=static_cast<size_t>(scene)>=info.size()?Scene::Game:scene;Restart();}
 void SceneView::SetEmotion(Emotion emotion){if(emotion_==emotion)return;emotion_=emotion;RenderAt(elapsed_);}
 void SceneView::SetTheme(ui::Theme theme){theme_=theme;ink_=theme==ui::Theme::Black?ui::kBambuGreen:0xFFFFFF;bg_=theme==ui::Theme::Black?0:ui::kBambuGreen;
@@ -74,16 +78,41 @@ void SceneView::SetTheme(ui::Theme theme){theme_=theme;ink_=theme==ui::Theme::Bl
 void SceneView::SetTelemetry(const ui::Telemetry& telemetry){telemetry_=telemetry;RenderAt(elapsed_);}
 void SceneView::SetAnimated(bool animated){animated_=animated;last_tick_=lv_tick_get();if(timer_){if(animated)lv_timer_resume(timer_);else lv_timer_pause(timer_);}}
 void SceneView::Restart(){last_tick_=lv_tick_get();RenderAt(0);}
-void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;Build();
- lv_label_set_text(title_,emotion_!=Emotion::Idle?Describe(emotion_).name:elapsed<1200?"BAMBU BOT / 2D > 3D":DescribeScene(scene_).name);
+void SceneView::EnableCoffeePlayback(bool enabled){coffee_enabled_=enabled;RenderAt(elapsed_);}
+void SceneView::UpdateCoffeePlayback(){
+ const bool active=coffee_enabled_ && width_==280 && height_==240 && !round_ && scene_==Scene::Coffee && emotion_==Emotion::Idle;
+ if(active!=coffee_active_){
+  coffee_active_=active;coffee_frame_=UINT32_MAX;
+  if(timer_)lv_timer_set_period(timer_,active?CoffeeClip::kFrameMs:frame_period_ms_);
+  if(!active)lv_obj_add_flag(coffee_image_,LV_OBJ_FLAG_HIDDEN);
+  lv_obj_invalidate(root_); // Clear the previous rendering mode exactly once.
+ }
+ if(!active)return;
+ const auto frame=CoffeeClip::FrameAt(elapsed_);
+ if(frame==coffee_frame_ && coffee_theme_==theme_)return;
+ const auto next=1-coffee_buffer_;auto& pixels=coffee_pixels_[next];
+ if(pixels.empty())pixels.resize(CoffeeClip::Width()*CoffeeClip::Height());
+ if(!CoffeeClip::Decode(theme_==ui::Theme::Green,frame,pixels.data(),pixels.size()))return;
+ auto& image=coffee_images_[next];lv_image_cache_drop(&image);
+ image.header.magic=LV_IMAGE_HEADER_MAGIC;image.header.cf=LV_COLOR_FORMAT_RGB565;
+ image.header.w=CoffeeClip::Width();image.header.h=CoffeeClip::Height();image.header.stride=CoffeeClip::Width()*2;
+ image.data_size=pixels.size()*2;image.data=reinterpret_cast<const uint8_t*>(pixels.data());
+ lv_image_set_src(coffee_image_,&image);lv_obj_remove_flag(coffee_image_,LV_OBJ_FLAG_HIDDEN);
+ coffee_buffer_=next;coffee_frame_=frame;coffee_theme_=theme_;
+}
+static void SetLabelIfChanged(lv_obj_t* label,const char* text) {
+ if(std::strcmp(lv_label_get_text(label),text)!=0)lv_label_set_text(label,text);
+}
+void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;UpdateCoffeePlayback();if(!coffee_active_)Build();
+ SetLabelIfChanged(title_,emotion_!=Emotion::Idle?Describe(emotion_).name:elapsed<1200?"BAMBU BOT / 2D > 3D":DescribeScene(scene_).name);
  char text[96];
  if(scene_==Scene::Error)std::snprintf(text,sizeof(text),"%sPrinter needs attention",telemetry_.demo?"DEMO / ":"");
  else if(scene_==Scene::Complete)std::snprintf(text,sizeof(text),"%sYour print is ready!",telemetry_.demo?"DEMO / ":"");
  else if(!telemetry_.connected||telemetry_.stale)std::snprintf(text,sizeof(text),"Printer data unavailable");
  else text[0]=0;
- lv_label_set_text(footer_,text);
+ SetLabelIfChanged(footer_,text);
  if(text[0])lv_obj_remove_flag(footer_,LV_OBJ_FLAG_HIDDEN);else lv_obj_add_flag(footer_,LV_OBJ_FLAG_HIDDEN);
- UpdateTelemetryHud();lv_obj_invalidate(root_);
+ UpdateTelemetryHud();if(!coffee_active_)lv_obj_invalidate(root_);
 }
 void SceneView::CreateTelemetryHud(){
  hud_=lv_obj_create(root_);lv_obj_remove_style_all(hud_);
@@ -118,10 +147,13 @@ void SceneView::CreateTelemetryHud(){
 }
 void SceneView::UpdateTelemetryHud(){
  const bool fresh=telemetry_.connected&&!telemetry_.stale;
- auto value=[&](int v){return !fresh||v<0?std::string("--"):std::to_string(v);};
- lv_label_set_text(values_[0],(value(telemetry_.progress)+"%").c_str());
- lv_label_set_text(values_[1],(value(telemetry_.nozzle_c)+" °C").c_str());
- lv_label_set_text(values_[2],(value(telemetry_.bed_c)+" °C").c_str());
+ const int data[3]={telemetry_.progress,telemetry_.nozzle_c,telemetry_.bed_c};
+ for(size_t i=0;i<values_.size();++i){
+  char text[24];const char* suffix=i==0?"%":" °C";
+  if(!fresh||data[i]<0)std::snprintf(text,sizeof(text),"--%s",suffix);
+  else std::snprintf(text,sizeof(text),"%d%s",data[i],suffix);
+  SetLabelIfChanged(values_[i],text);
+ }
  lv_bar_set_value(progress_bar_,fresh&&telemetry_.progress>=0?std::clamp(telemetry_.progress,0,100):0,LV_ANIM_OFF);
 }
 
@@ -193,8 +225,10 @@ void SceneView::Head(float m,float time){
 }
 void SceneView::Build(){
  count_=0;overflow_=false;float t=elapsed_/1000.f;float u=std::clamp(t/1.2f,0.f,1.f);morph_=u*u*(3-2*u);time_=std::max(0.f,t-1.2f);
+ // Coffee loops every 2*pi seconds after the intro, including head yaw and steam.
+ if(scene_==Scene::Coffee)time_=std::fmod(time_,2*pi);
  float m=morph_,s=std::sin(time_*2),beat=std::sin(time_*5);
- yaw_=m*(.25f+.12f*std::sin(time_*.9f));pitch_=m*-.08f;shift_=0;bob_=m*s*2;
+ yaw_=m*(.25f+.12f*std::sin(time_*(scene_==Scene::Coffee?1.f:.9f)));pitch_=m*-.08f;shift_=0;bob_=m*s*2;
  if(scene_==Scene::Fly||scene_==Scene::PaperPlane)yaw_=m*std::sin(time_*1.7f)*.45f;
  if(scene_==Scene::Nap)pitch_=m*(.12f+.22f*(s+1));
  if(scene_==Scene::Music||scene_==Scene::Dance){bob_=m*beat*4;pitch_+=m*beat*.08f;}
@@ -248,7 +282,7 @@ void SceneView::Build(){
  }
  std::sort(items_.begin(),items_.begin()+count_,[](const Item& a,const Item& b){return a.depth>b.depth;});
 }
-void SceneView::Draw(lv_layer_t* layer){
+void SceneView::Rasterize(){
  // Reused buffers; visibility comes from per-pixel inverse-depth, including face decals.
  std::fill(pixels_.begin(),pixels_.end(),bg_|0xFF000000);std::fill(depth_.begin(),depth_.end(),0.f);
  struct P {float x,y,iz;};
@@ -277,6 +311,10 @@ void SceneView::Draw(lv_layer_t* layer){
  }
  if(round_)for(int y=0;y<render_height_;++y)for(int x=0;x<render_width_;++x){float dx=x+.5f-render_width_/2.f,dy=y+.5f-render_height_/2.f;
   if(dx*dx+dy*dy>render_width_*render_width_/4.f)pixels_[y*render_width_+x]=0;}
+}
+void SceneView::Draw(lv_layer_t* layer){
+ if(coffee_active_)return;
+ Rasterize();
  lv_area_t area;lv_obj_get_coords(root_,&area);
  lv_draw_image_dsc_t d;lv_draw_image_dsc_init(&d);d.src=&image_;d.scale_x=d.scale_y=256*render_divisor_;d.pivot={0,0};
  area.x2=area.x1+render_width_-1;area.y2=area.y1+render_height_-1;lv_draw_image(layer,&d,&area);

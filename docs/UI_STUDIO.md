@@ -132,3 +132,11 @@ python3 scripts/package_studio.py
 ```
 
 Script kèm SDL2 và thông báo giấy phép, đổi đường dẫn thư viện sang bundle, ký ad-hoc, kiểm tra chữ ký và chạy smoke test từ bản bundle. Nó từ chối đóng gói bản chứa sanitizer. Kết quả: `.app` và ZIP theo kiến trúc máy trong `dist/`. Việc ký được thực hiện ở thư mục tạm để tránh metadata AppleDouble của ổ ngoài đi vào bundle.
+
+### Coffee playback experiment
+
+Desk-bot 280×240 → 3D scenes → Coffee break now uses native-resolution,
+pre-rendered RGB565 frames, with a 20 FPS scheduling target and independent
+LVGL telemetry. Start directly with `./scripts/run_simulator.sh --coffee-demo`.
+See [COFFEE_PLAYBACK.md](COFFEE_PLAYBACK.md) for memory costs, build profiles,
+asset generation and hardware validation limits.

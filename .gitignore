@@ -26,3 +26,5 @@ bambu.local.json
 *.key
 simulator/build/
 simulator/build-asan/
+
+build-coffee-demo/

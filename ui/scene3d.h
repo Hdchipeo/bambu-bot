@@ -1,6 +1,7 @@
 #pragma once
 #include "bambu_face.h"
 #include "printer_icon.h"
+#include "coffee_clip.h"
 #include <memory>
 #include <array>
 #include <cstddef>
@@ -34,6 +35,11 @@ public:
     size_t primitive_count() const { return count_; }
     size_t raster_storage_bytes() const { return pixels_.size()*sizeof(uint32_t)+depth_.size()*sizeof(float); }
     bool overflowed() const { return overflow_; }
+    void EnableCoffeePlayback(bool enabled);
+    bool coffee_playback_active() const { return coffee_active_; }
+    size_t coffee_buffer_bytes() const { return (coffee_pixels_[0].size()+coffee_pixels_[1].size())*sizeof(uint16_t); }
+    uint32_t coffee_frame() const { return coffee_frame_; }
+    const std::vector<uint32_t>& RasterFrame() { Rasterize(); return pixels_; }
 private:
     struct V { float x,y,z; };
     struct Item { std::array<V,3> p; uint32_t color; float depth,width; uint8_t opacity; bool line; };
@@ -46,6 +52,8 @@ private:
     void Cup(V center,float radius,float height,bool tea);
     void Head(float morph,float time);
     void Build();
+    void UpdateCoffeePlayback();
+    void Rasterize();
     void Draw(lv_layer_t* layer);
     void CreateTelemetryHud();
     void UpdateTelemetryHud();
@@ -56,6 +64,13 @@ private:
     std::array<std::array<lv_point_precise_t,10>,12> hud_points_{};
     lv_timer_t* timer_=nullptr;
     lv_image_dsc_t image_{};
+    lv_obj_t* coffee_image_=nullptr;
+    std::array<lv_image_dsc_t,2> coffee_images_{};
+    std::array<std::vector<uint16_t>,2> coffee_pixels_;
+    bool coffee_enabled_=true,coffee_active_=false;
+    int coffee_buffer_=0;
+    uint32_t coffee_frame_=UINT32_MAX,frame_period_ms_=33;
+    ui::Theme coffee_theme_=ui::Theme::Black;
     std::vector<uint32_t> pixels_;
     std::vector<float> depth_;
     bool round_=false;

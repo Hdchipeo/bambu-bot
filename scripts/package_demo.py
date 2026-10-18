@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Package the credential-free default build for manual flashing."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -10,20 +11,30 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    if (ROOT / "main/bambu/local_config.h").exists():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-dir", default="build")
+    args = parser.parse_args()
+    build = ROOT / args.build_dir
+    cache = (build / "CMakeCache.txt").read_text()
+    forced_demo = "BAMBU_FORCE_DEMO:BOOL=ON" in cache.splitlines()
+    if (ROOT / "main/bambu/local_config.h").exists() and not forced_demo:
         raise SystemExit("Refusing to package a build with local configuration. Remove it and rebuild the default demo first.")
-    description = json.loads((ROOT / "build/project_description.json").read_text())
+    if forced_demo and b"BAMBU_CREDENTIAL_FREE_DEMO_PROFILE" not in (build / "bambu_bot.bin").read_bytes():
+        raise SystemExit("Refusing to package: binary lacks the forced-demo marker. Rebuild first.")
+    description = json.loads((build / "project_description.json").read_text())
     version = description["project_version"]
     sources = {
-        "bootloader.bin": "build/bootloader/bootloader.bin",
-        "partition-table.bin": "build/partition_table/partition-table.bin",
-        "ota_data_initial.bin": "build/ota_data_initial.bin",
-        "bambu_bot.bin": "build/bambu_bot.bin",
-        "generated_assets.bin": "build/generated_assets.bin",
+        "bootloader.bin": "bootloader/bootloader.bin",
+        "partition-table.bin": "partition_table/partition-table.bin",
+        "ota_data_initial.bin": "ota_data_initial.bin",
+        "bambu_bot.bin": "bambu_bot.bin",
+        "generated_assets.bin": "generated_assets.bin",
     }
     manifest = {"project": "bambu-bot", "version": version, "profile": "deskbot-demo",
+                "forced_demo": forced_demo,
+                "coffee_preview": "BAMBU_COFFEE_PREVIEW:BOOL=ON" in cache,
                 "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-                "sha256": {name: hashlib.sha256((ROOT / src).read_bytes()).hexdigest()
+                "sha256": {name: hashlib.sha256((build / src).read_bytes()).hexdigest()
                            for name, src in sources.items()}}
     instructions = f"""Bambu Bot {version} - Desk-bot hardware DEMO
 
@@ -32,8 +43,10 @@ This is simulated printer data. Servo outputs are disabled.
 UI: short BOOT toggles chat; hold BOOT toggles black/green vs green/white theme.
 Theme is saved to NVS. The compact LCD intentionally hides the DEMO label.
 Head-only 3D UI renders at 140x120, scaled to 280x240; telemetry icons/text are native resolution.
-The 100 ms animation timer is a target; hardware FPS/audio/MQTT performance is unverified.
-Firmware was compiled; physical hardware has not been verified.
+Coffee on 280x240 uses native 167x129 pre-rendered RGB565 frames, 50 ms target (20 FPS).
+Other 3D scenes retain the 100 ms CPU renderer. When enabled, the coffee preview profile
+overrides idle/printing visuals; conversation and printer alerts take priority.
+Actual LCD FPS and audio/MQTT performance of this experimental clip are unverified.
 
 Install esptool 4.x in your Python environment or activate ESP-IDF 5.5.4.
 Unzip all files in one directory. Replace PORT with the USB-UART device path:
@@ -49,7 +62,7 @@ Check source README.md for Wi-Fi, AI activation, LAN configuration and limitatio
     target.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, src in sources.items():
-            archive.write(ROOT / src, name)
+            archive.write(build / src, name)
         archive.writestr("manifest.json", json.dumps(manifest, indent=2) + "\n")
         archive.writestr("FLASHING.txt", instructions)
     with zipfile.ZipFile(target) as archive:

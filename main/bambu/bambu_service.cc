@@ -199,6 +199,9 @@ void Task(void*) {
 }  // namespace
 
 void StartService() {
+#ifdef BAMBU_FORCE_DEMO
+    ESP_LOGI(kTag, "BAMBU_CREDENTIAL_FREE_DEMO_PROFILE");
+#endif
     state.SetDemo(BAMBU_DEMO);
     if (std::strlen(BAMBU_OTA_URL) > 0) {
         Settings settings("wifi", true);

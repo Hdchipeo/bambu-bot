@@ -9,5 +9,7 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 # "Trim" the build. Include the minimal set of components, main, and anything it depends on.
 idf_build_set_property(MINIMAL_BUILD ON)
 
-set(PROJECT_VER "0.3.0")
+option(BAMBU_COFFEE_PREVIEW "Show coffee while assistant is idle; retain printer alerts" OFF)
+option(BAMBU_FORCE_DEMO "Build without local printer credentials" OFF)
+set(PROJECT_VER "0.3.1-coffee-preview")
 project(bambu_bot)
