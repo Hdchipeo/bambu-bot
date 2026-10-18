@@ -564,6 +564,12 @@ void Export(Canvas& canvas,const fs::path& output) {
             canvas.SaveLcd(studio.scene().root(),output/"animation"/name);
         }
     }
+    {
+        auto card=Box(lv_screen_active(),0,0,220,232,0xFFFFFF,0);
+        {bambu::studio::PrinterIconView icon(card,180,0x000000,2);
+         lv_obj_set_pos(icon.root(),20,20);canvas.Frame(ticks+1);canvas.SaveLcd(card,output/"printer-icon.bmp");}
+        lv_obj_delete(card);
+    }
     auto sheet=Box(lv_screen_active(),0,0,kWidth,kHeight,0x0B120F,0);
     Label(sheet,36,34,"One little bot. Fourteen ways to feel.",&lv_font_montserrat_28,0xEAF3E8);
     Label(sheet,36,79,"BAMBU BOT   /   CHARACTER STUDY   /   LVGL VECTOR COMPONENT",&lv_font_montserrat_12,0x88A18D);

@@ -1,5 +1,7 @@
 #pragma once
 #include "bambu_face.h"
+#include "printer_icon.h"
+#include <memory>
 #include <array>
 #include <cstddef>
 #include <vector>
@@ -46,6 +48,7 @@ private:
     void CreateTelemetryHud();
     void UpdateTelemetryHud();
     lv_obj_t *root_=nullptr,*title_=nullptr,*footer_=nullptr;
+    std::unique_ptr<PrinterIconView> printer_icon_;
     lv_obj_t *hud_=nullptr,*progress_bar_=nullptr;
     std::array<lv_obj_t*,3> values_{};
     std::array<std::array<lv_point_precise_t,10>,12> hud_points_{};

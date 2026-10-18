@@ -1,6 +1,6 @@
 # Bambu Bot — 3D idle stories
 
-Bản thử nghiệm **Emotion Studio 0.3.2**, triển khai trước trên simulator macOS. Bấm **3D scenes** hoặc **D** để chuyển từ bộ 14 emotion 2D sang bộ 18 hoạt cảnh 3D. Chọn một cảnh để chạy phần mở đầu: mặt phẳng dần có độ dày, đầu robot lớn hơn được đặt giữa màn hình và đạo cụ xuất hiện trong **1,2 giây**, sau đó bot bắt đầu hoạt động.
+Bản thử nghiệm **Emotion Studio 0.3.3**, triển khai trước trên simulator macOS. Bấm **3D scenes** hoặc **D** để chuyển từ bộ 14 emotion 2D sang bộ 18 hoạt cảnh 3D. Chọn một cảnh để chạy phần mở đầu: mặt phẳng dần có độ dày, đầu robot lớn hơn được đặt giữa màn hình và đạo cụ xuất hiện trong **1,2 giây**, sau đó bot bắt đầu hoạt động.
 
 Từ **0.3.1**, robot chỉ có **phần đầu**; đã bỏ toàn bộ thân, tay, bàn tay, chân và bàn chân. Đầu được phóng lớn, đặt lại gần giữa màn hình; đạo cụ vẫn chuyển động độc lập quanh đầu.
 
@@ -31,7 +31,11 @@ Phần nền và nét chính dùng Bambu Green `#00AE42`, đen hoặc trắng th
 
 Ba nhóm icon/số cố định dưới hoạt cảnh: **bản in → tiến độ %**, **đầu phun → °C**, **bàn nhiệt → °C**, cùng thanh tiến độ mảnh bên dưới. Kích thước và khoảng cách được căn riêng cho 466×466 và 280×240. Các nét theo màu theme xanh Bambu hoặc trắng.
 
-Các outline LVGL được vẽ độc lập theo hình thái trong Bambu Studio: [monitor_item_print](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_item_print.svg), [monitor_nozzle_temp](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_nozzle_temp.svg), [monitor_bed_temp](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_bed_temp.svg). Không nhập SVG/mã nguồn của Studio. Thiếu từng giá trị dùng `--`; offline/stale xóa số đo hiện tại và đưa thanh tiến độ về rỗng. Cảnh Complete/Error có dòng chú thích DEMO dưới tên cảnh, giữ vùng icon/số ở đáy màn hình.
+Từ **0.3.3**, icon bản in được vẽ lại theo ảnh máy in 3D người dùng cung cấp: khung máy, thanh dẫn hướng, đầu phun, khối lập phương, bàn in, màn hình điều khiển, núm tròn và chân đế. Hình học dùng chung cho LVGL (`simulator/printer_icon.h`) và [SVG phóng lớn](ui/printer-icon.svg); màu icon vẫn theo theme.
+
+![Printer icon reference redraw](ui/printer-icon.png)
+
+Các icon nhiệt độ vẫn được vẽ độc lập theo hình thái trong Bambu Studio: [monitor_nozzle_temp](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_nozzle_temp.svg), [monitor_bed_temp](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_bed_temp.svg). Không nhập SVG/mã nguồn của Studio. Thiếu từng giá trị dùng `--`; offline/stale xóa số đo hiện tại và đưa thanh tiến độ về rỗng. Cảnh Complete/Error có dòng chú thích DEMO dưới tên cảnh, giữ vùng icon/số ở đáy màn hình.
 
 ## Kịch bản
 

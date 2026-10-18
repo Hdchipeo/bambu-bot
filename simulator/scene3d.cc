@@ -58,10 +58,11 @@ SceneView::SceneView(lv_obj_t* parent,int w,int h,bool round):width_(w),height_(
   auto now=lv_tick_get();auto dt=now-self->last_tick_;self->last_tick_=now;self->RenderAt(self->elapsed_+dt);
  },33,this);
 }
-SceneView::~SceneView(){if(timer_)lv_timer_delete(timer_);lv_image_cache_drop(&image_);lv_obj_delete(root_);}
+SceneView::~SceneView(){if(timer_)lv_timer_delete(timer_);lv_image_cache_drop(&image_);printer_icon_.reset();lv_obj_delete(root_);}
 void SceneView::SetScene(Scene scene){scene_=static_cast<size_t>(scene)>=info.size()?Scene::Game:scene;Restart();}
 void SceneView::SetTheme(ui::Theme theme){theme_=theme;ink_=theme==ui::Theme::Black?ui::kBambuGreen:0xFFFFFF;bg_=theme==ui::Theme::Black?0:ui::kBambuGreen;
  lv_obj_set_style_bg_color(root_,lv_color_hex(bg_),0);for(auto l:{title_,footer_})lv_obj_set_style_text_color(l,lv_color_hex(ink_),0);
+ printer_icon_->SetColor(ink_);
  for(auto value:values_)lv_obj_set_style_text_color(value,lv_color_hex(ink_),0);
  for(uint32_t i=0;i<lv_obj_get_child_count(hud_);++i){auto child=lv_obj_get_child(hud_,static_cast<int>(i));
   if(lv_obj_check_type(child,&lv_line_class))lv_obj_set_style_line_color(child,lv_color_hex(ink_),0);}
@@ -84,21 +85,18 @@ void SceneView::RenderAt(uint32_t elapsed){elapsed_=elapsed;Build();
 void SceneView::CreateTelemetryHud(){
  hud_=lv_obj_create(root_);lv_obj_remove_style_all(hud_);
  const int width=round_?252:232;
- lv_obj_set_size(hud_,width,round_?34:30);lv_obj_align(hud_,LV_ALIGN_BOTTOM_MID,0,round_?-35:-8);
+ lv_obj_set_size(hud_,width,round_?40:36);lv_obj_align(hud_,LV_ALIGN_BOTTOM_MID,0,round_?-35:-8);
  lv_obj_remove_flag(hud_,static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE|LV_OBJ_FLAG_SCROLLABLE));
  const float size=round_?1.f:.9f;
  auto line=[&](size_t index,int x,std::initializer_list<lv_point_precise_t> points){
-  auto obj=lv_line_create(hud_);lv_obj_set_pos(obj,x,0);
+  auto obj=lv_line_create(hud_);lv_obj_set_pos(obj,x,5);
   lv_obj_set_style_line_width(obj,round_?2:1,0);lv_obj_set_style_line_rounded(obj,true,0);
   lv_obj_remove_flag(obj,LV_OBJ_FLAG_CLICKABLE);
   size_t i=0;for(auto p:points)hud_points_[index][i++]={static_cast<lv_value_precise_t>(std::lround(p.x*size)),static_cast<lv_value_precise_t>(std::lround(p.y*size))};
   lv_line_set_points(obj,hud_points_[index].data(),i);
  };
- // Independent outlines inspired by Bambu Studio monitor_item_print/nozzle/bed icons.
- line(0,0,{{1,6},{1,14},{5,14},{5,10},{15,10},{15,14},{19,14},{19,6},{1,6}});
- line(1,0,{{5,6},{5,1},{15,1},{15,6}});
- line(2,0,{{5,10},{5,20},{15,20},{15,10}});
- line(3,0,{{8,13},{12,13},{12,16},{8,16}});
+ // Framed 3D printer: gantry, extruder, cube, bed, control panel and feet.
+ printer_icon_=std::make_unique<PrinterIconView>(hud_,round_?28:26,ink_);
  const int nozzle=round_?84:74,bed=round_?178:160;
  line(4,nozzle,{{6,1},{12,1},{12,6},{16,6},{9,12},{2,6},{6,6},{6,1}});
  line(5,nozzle,{{3,13},{2,15},{4,17},{3,19}});
@@ -106,12 +104,12 @@ void SceneView::CreateTelemetryHud(){
  line(7,nozzle,{{15,13},{14,15},{16,17},{15,19}});
  line(8,bed,{{1,16},{19,16},{19,19},{1,19},{1,16}});
  for(int i=0;i<3;++i){lv_value_precise_t x=4+i*6;line(9+i,bed,{{x,2},{x-1,4},{x+1,7},{x-1,10},{x,13}});}
- const int positions[3]={round_?26:24,round_?110:98,round_?204:184};
- for(size_t i=0;i<values_.size();++i){values_[i]=lv_label_create(hud_);lv_obj_set_pos(values_[i],positions[i],3);
+ const int positions[3]={round_?34:32,round_?110:98,round_?204:184};
+ for(size_t i=0;i<values_.size();++i){values_[i]=lv_label_create(hud_);lv_obj_set_pos(values_[i],positions[i],7);
   lv_obj_set_size(values_[i],i==1?58:48,22);lv_label_set_long_mode(values_[i],LV_LABEL_LONG_CLIP);
   lv_obj_set_style_text_font(values_[i],round_?&lv_font_montserrat_14:&lv_font_montserrat_12,0);}
  progress_bar_=lv_bar_create(hud_);lv_obj_remove_style_all(progress_bar_);
- lv_obj_set_pos(progress_bar_,0,round_?30:27);lv_obj_set_size(progress_bar_,width,2);
+ lv_obj_set_pos(progress_bar_,0,round_?36:32);lv_obj_set_size(progress_bar_,width,2);
  lv_bar_set_range(progress_bar_,0,100);lv_obj_set_style_bg_opa(progress_bar_,LV_OPA_20,LV_PART_MAIN);
  lv_obj_set_style_bg_opa(progress_bar_,LV_OPA_COVER,LV_PART_INDICATOR);
 }

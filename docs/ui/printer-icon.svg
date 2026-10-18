@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 192" width="180" height="192" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+<polyline points="5,8 6,4 9,1 171,1 174,4 175,8 175,174 173,179 170,181 10,181 6,179 5,175 5,8"/>
+<polyline points="5,23 175,23"/>
+<polyline points="5,145 175,145"/>
+<polyline points="21,23 21,145"/>
+<polyline points="27,23 27,145"/>
+<polyline points="153,23 153,145"/>
+<polyline points="159,23 159,145"/>
+<polyline points="22,38 32,38 32,56 22,56 22,38"/>
+<polyline points="149,38 159,38 159,56 149,56 149,38"/>
+<polyline points="32,43 75,43"/>
+<polyline points="32,51 75,51"/>
+<polyline points="104,43 149,43"/>
+<polyline points="104,51 149,51"/>
+<polyline points="85,34 85,21 87,15 91,11 97,8 105,8 111,10 117,15 120,21 120,23"/>
+<polyline points="80,34 80,30 91,30 91,34"/>
+<polyline points="78,34 101,34 104,37 104,60 101,63 77,63 75,60 75,37 78,34"/>
+<polyline points="82,42 96,42"/>
+<polyline points="82,49 96,49"/>
+<polyline points="83,63 83,68 95,68 95,63"/>
+<polyline points="86,68 88,73 91,73 93,68"/>
+<polyline points="63,89 86,81 109,89 109,116 86,126 63,117 63,89"/>
+<polyline points="63,89 86,98 109,89"/>
+<polyline points="86,98 86,126"/>
+<polyline points="63,119 39,119 32,130 140,130 133,119 105,119"/>
+<polyline points="32,130 32,136 140,136 140,130"/>
+<polyline points="43,136 43,145"/>
+<polyline points="49,136 49,145"/>
+<polyline points="123,136 123,145"/>
+<polyline points="129,136 129,145"/>
+<polyline points="31,153 69,153 71,155 71,171 69,173 31,173 29,171 29,155 31,153"/>
+<polyline points="13,181 13,186 16,188 26,188 29,186 29,181"/>
+<polyline points="151,181 151,186 154,188 164,188 167,186 167,181"/>
+<polyline points="152,163 152,165 151,167 149,169 147,170 145,170 143,170 141,169 139,167 138,165 138,163 138,161 139,159 141,157 143,156 145,156 147,156 149,157 151,159 152,161 152,163"/>
+</svg>
