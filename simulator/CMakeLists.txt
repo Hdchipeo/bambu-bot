@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(BambuBotStudio VERSION 0.2.0 LANGUAGES C CXX ASM)
+project(BambuBotStudio VERSION 0.2.1 LANGUAGES C CXX ASM)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -42,11 +42,12 @@ target_compile_options(bambu_face PRIVATE -Wall -Wextra -Werror)
 add_executable(bambu_studio MACOSX_BUNDLE main.cc)
 target_link_libraries(bambu_studio PRIVATE bambu_face SDL2::SDL2)
 target_compile_options(bambu_studio PRIVATE -Wall -Wextra -Werror)
+target_compile_definitions(bambu_studio PRIVATE BAMBU_STUDIO_VERSION="${PROJECT_VERSION}")
 set_target_properties(bambu_studio PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "Bambu Bot Studio"
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.hdchipeo.bambubot.studio"
-    MACOSX_BUNDLE_BUNDLE_VERSION "0.2.0"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "0.2.0")
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
 
 if(BAMBU_SANITIZERS)
     foreach(target bambu_lvgl bambu_face bambu_studio)

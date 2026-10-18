@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import platform
+import plistlib
 import shutil
 import subprocess
 import tempfile
@@ -33,6 +34,8 @@ def copy_clean(source, target):
 
 def main():
     source = ROOT / "simulator/build/bambu_studio.app"
+    with (source / "Contents/Info.plist").open("rb") as info:
+        version = plistlib.load(info)["CFBundleShortVersionString"]
     dependencies = command("otool", "-L", str(source / "Contents/MacOS/bambu_studio"))
     if "asan" in dependencies or "ubsan" in dependencies:
         raise SystemExit("Build with BAMBU_SANITIZERS=OFF first.")
@@ -43,7 +46,7 @@ def main():
     dist = ROOT / "dist"
     dist.mkdir(exist_ok=True)
     destination = dist / "Bambu Bot Studio.app"
-    archive = dist / f"bambu-bot-studio-macos-{platform.machine()}-v0.2.0.zip"
+    archive = dist / f"bambu-bot-studio-macos-{platform.machine()}-v{version}.zip"
     with tempfile.TemporaryDirectory(prefix="bambu-studio-package-") as temporary:
         staged = Path(temporary) / destination.name
         copy_clean(source, staged)

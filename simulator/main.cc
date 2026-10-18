@@ -65,7 +65,7 @@ struct Canvas {
     int mouse_x=0,mouse_y=0;
     bool pressed=false;
     explicit Canvas(bool headless) {
-        if (SDL_Init(headless?SDL_INIT_TIMER:(SDL_INIT_TIMER|SDL_INIT_VIDEO))<0) throw std::runtime_error(SDL_GetError());
+        if (SDL_Init(SDL_INIT_TIMER|SDL_INIT_EVENTS|(headless?0:SDL_INIT_VIDEO))<0) throw std::runtime_error(SDL_GetError());
         lv_init();
         lv_tick_set_cb([](){return ticks;});
         display=lv_display_create(kWidth,kHeight);
@@ -85,7 +85,7 @@ struct Canvas {
         lv_obj_set_style_text_font(lv_screen_active(),&lv_font_montserrat_14,0);
         lv_obj_remove_flag(lv_screen_active(),LV_OBJ_FLAG_SCROLLABLE);
         if (!headless) {
-            window=SDL_CreateWindow("Bambu Bot | Emotion Studio",SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,
+            window=SDL_CreateWindow("Bambu Bot | Emotion Studio " BAMBU_STUDIO_VERSION,SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,
                 kWidth,kHeight,SDL_WINDOW_SHOWN|SDL_WINDOW_ALLOW_HIGHDPI);
             if (!window) throw std::runtime_error(SDL_GetError());
             renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
@@ -94,15 +94,40 @@ struct Canvas {
             SDL_RenderSetLogicalSize(renderer,kWidth,kHeight);
             texture=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGB888,SDL_TEXTUREACCESS_STREAMING,kWidth,kHeight);
             if (!texture) throw std::runtime_error(SDL_GetError());
-            mouse=lv_indev_create();
-            lv_indev_set_type(mouse,LV_INDEV_TYPE_POINTER);
-            lv_indev_set_user_data(mouse,this);
-            lv_indev_set_read_cb(mouse,[](lv_indev_t* input,lv_indev_data_t* data) {
-                auto self=static_cast<Canvas*>(lv_indev_get_user_data(input));
-                data->point.x=self->mouse_x; data->point.y=self->mouse_y;
-                data->state=self->pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
-            });
         }
+        mouse=lv_indev_create();
+        lv_indev_set_type(mouse,LV_INDEV_TYPE_POINTER);
+        lv_indev_set_display(mouse,display);
+        lv_indev_set_mode(mouse,LV_INDEV_MODE_EVENT);
+        lv_indev_set_user_data(mouse,this);
+        lv_indev_set_read_cb(mouse,[](lv_indev_t* input,lv_indev_data_t* data) {
+            auto self=static_cast<Canvas*>(lv_indev_get_user_data(input));
+            data->point.x=self->mouse_x; data->point.y=self->mouse_y;
+            data->state=self->pressed?LV_INDEV_STATE_PRESSED:LV_INDEV_STATE_RELEASED;
+        });
+    }
+    void HandlePointerEvent(const SDL_Event& event) {
+        switch (event.type) {
+            case SDL_MOUSEMOTION:
+                // SDL_RenderSetLogicalSize already converts native/Retina coordinates.
+                mouse_x=event.motion.x;mouse_y=event.motion.y;
+                break;
+            case SDL_MOUSEBUTTONDOWN:
+            case SDL_MOUSEBUTTONUP:
+                if (event.button.button!=SDL_BUTTON_LEFT) return;
+                mouse_x=event.button.x;mouse_y=event.button.y;
+                pressed=event.type==SDL_MOUSEBUTTONDOWN;
+                break;
+            case SDL_WINDOWEVENT:
+                if (event.window.event!=SDL_WINDOWEVENT_FOCUS_LOST) return;
+                // Cancel an interrupted press instead of generating a click on focus loss.
+                lv_indev_reset(mouse,nullptr);
+                pressed=false;
+                break;
+            default:return;
+        }
+        // Preserve every edge, including down/up queued together between rendered frames.
+        lv_indev_read(mouse);
     }
     void Frame(uint32_t now) {
         ticks=now;
@@ -150,7 +175,7 @@ public:
         Label(root_,88,60,"A little companion for every print.",&lv_font_montserrat_12,0x819D8C);
         auto tag=Box(root_,917,37,211,30,0x13241B,15);
         Box(tag,13,11,7,7,0x9DE5A9,4);
-        Label(tag,29,8,"EMOTION STUDIO  /  01",&lv_font_montserrat_12,0xB8D2BE);
+        Label(tag,29,8,"EMOTION STUDIO  /  " BAMBU_STUDIO_VERSION,&lv_font_montserrat_12,0xB8D2BE);
 
         auto left=Box(root_,32,108,640,585,0x101D16,22); Border(left,0x22362A);
         Label(left,24,22,"DEVICE PREVIEW",&lv_font_montserrat_12,0x88A18D);
@@ -249,6 +274,13 @@ public:
     bool round() const {return round_;}
     FaceView& face() {return *face_;}
     lv_obj_t* button(int i) {return buttons_[i];}
+    lv_obj_t* round_button() {return round_button_;}
+    lv_obj_t* rect_button() {return rect_button_;}
+    lv_obj_t* slider() {return slider_;}
+    lv_obj_t* play_button() {return play_button_;}
+    lv_obj_t* motion_button() {return motion_button_;}
+    int progress() const {return progress_;}
+    bool playing() const {return auto_;}
 private:
     struct Action {Studio* studio=nullptr;int index=0;};
     static void SetButtonText(lv_obj_t* button,const char* text) {lv_label_set_text(lv_obj_get_child(button,0),text);}
@@ -270,12 +302,69 @@ std::string AllText(lv_obj_t* obj) {
 }
 void Require(bool condition,const char* message) {if (!condition) throw std::runtime_error(message);}
 
+void QueueButton(Uint32 type,int x,int y,Uint8 button=SDL_BUTTON_LEFT) {
+    SDL_Event event{};
+    event.type=type;event.button.button=button;event.button.x=x;event.button.y=y;
+    Require(SDL_PushEvent(&event)==1,"Could not queue SDL mouse event");
+}
+void DrainPointerEvents(Canvas& canvas) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) canvas.HandlePointerEvent(event);
+}
+void FastClick(Canvas& canvas,lv_obj_t* button) {
+    lv_obj_update_layout(button);
+    lv_area_t area;lv_obj_get_coords(button,&area);
+    int x=(area.x1+area.x2)/2,y=(area.y1+area.y2)/2;
+    // Both edges enter the same SDL event batch, before any LVGL timer/frame runs.
+    QueueButton(SDL_MOUSEBUTTONDOWN,x,y);QueueButton(SDL_MOUSEBUTTONUP,x,y);
+    DrainPointerEvents(canvas);
+    canvas.Frame(ticks+50);
+}
 void SelfTest(Canvas& canvas) {
     Studio studio;
+    canvas.Frame(ticks+100);
+    FastClick(canvas,studio.button(static_cast<int>(Emotion::Happy)));
+    Require(studio.selected()==static_cast<int>(Emotion::Happy),"Fast SDL click lost before LVGL timer read");
+    FastClick(canvas,studio.rect_button());
+    Require(!studio.round(),"Fast click did not select Desk-bot display");
+    FastClick(canvas,studio.round_button());
+    Require(studio.round(),"Fast click did not select Round display");
+    FastClick(canvas,studio.motion_button());
+    Require(!studio.face().animated(),"Mouse motion toggle failed");
+    FastClick(canvas,studio.motion_button());
+    Require(studio.face().animated(),"Mouse motion toggle did not resume");
+    FastClick(canvas,studio.play_button());
+    Require(studio.playing(),"Mouse sequence toggle failed");
+    FastClick(canvas,studio.play_button());
+    Require(!studio.playing(),"Mouse sequence toggle did not stop");
+    lv_obj_update_layout(studio.slider());
+    lv_area_t slider_area;lv_obj_get_coords(studio.slider(),&slider_area);
+    const int slider_y=(slider_area.y1+slider_area.y2)/2;
+    QueueButton(SDL_MOUSEBUTTONDOWN,slider_area.x1+lv_area_get_width(&slider_area)/4,slider_y);
+    SDL_Event move{};move.type=SDL_MOUSEMOTION;
+    move.motion.x=slider_area.x1+lv_area_get_width(&slider_area)*3/4;move.motion.y=slider_y;
+    move.motion.state=SDL_BUTTON_LMASK;
+    Require(SDL_PushEvent(&move)==1,"Could not queue SDL drag");
+    QueueButton(SDL_MOUSEBUTTONUP,move.motion.x,move.motion.y);
+    DrainPointerEvents(canvas);canvas.Frame(ticks+50);
+    Require(studio.progress()>=70 && studio.progress()<=80,"Batched SDL slider drag lost");
+    lv_area_t other_button;lv_obj_get_coords(studio.button(static_cast<int>(Emotion::Error)),&other_button);
+    const int click_x=(other_button.x1+other_button.x2)/2,click_y=(other_button.y1+other_button.y2)/2;
+    const int before_cancel=studio.selected();
+    QueueButton(SDL_MOUSEBUTTONDOWN,click_x,click_y);
+    SDL_Event focus{};focus.type=SDL_WINDOWEVENT;focus.window.event=SDL_WINDOWEVENT_FOCUS_LOST;
+    Require(SDL_PushEvent(&focus)==1,"Could not queue focus loss");
+    QueueButton(SDL_MOUSEBUTTONUP,click_x,click_y);
+    DrainPointerEvents(canvas);canvas.Frame(ticks+50);
+    Require(studio.selected()==before_cancel,"Interrupted press activated a button");
+    QueueButton(SDL_MOUSEBUTTONDOWN,click_x,click_y,SDL_BUTTON_RIGHT);
+    QueueButton(SDL_MOUSEBUTTONUP,click_x,click_y,SDL_BUTTON_RIGHT);
+    DrainPointerEvents(canvas);canvas.Frame(ticks+50);
+    Require(studio.selected()==before_cancel,"Right click activated a left-click button");
     const auto nodes=lv_obj_get_child_count(studio.face().root());
     for (int pass=0;pass<3;++pass) {
         for (int i=0;i<kCount;++i) {
-            lv_obj_send_event(studio.button(i),LV_EVENT_CLICKED,nullptr);
+            FastClick(canvas,studio.button(i));
             Require(studio.selected()==i,"Emotion button failed");
             Require(studio.face().emotion()==static_cast<Emotion>(i),"Emotion state mismatch");
             for (int j=0;j<4;++j) canvas.Frame(ticks+100);
@@ -302,9 +391,10 @@ void SelfTest(Canvas& canvas) {
     Require(bambu::ui::FromXiaozhi("neutral")==Emotion::Idle,"XiaoZhi alias mismatch");
     Require(bambu::ui::FromXiaozhi("shocked")==Emotion::Error,"XiaoZhi error alias mismatch");
     Require(bambu::ui::FromXiaozhi("unrecognized")==Emotion::Idle,"Unknown emotion fallback mismatch");
+    const int before_cycle=studio.selected();
     studio.ToggleAuto();canvas.Frame(ticks+3600);studio.Tick();
-    Require(studio.selected()==1,"Auto sequence failed");
-    std::cout<<"PASS: 14 emotion buttons, animated transitions, display switching, bounded objects, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
+    Require(studio.selected()==(before_cycle+1)%kCount,"Auto sequence failed");
+    std::cout<<"PASS: fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
 }
 
 void Export(Canvas& canvas,const fs::path& output) {
@@ -361,15 +451,11 @@ int main(int argc,char** argv) {
         Studio studio;
         bool running=true;
         while (running) {
+            ticks=SDL_GetTicks();
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 if (event.type==SDL_QUIT) running=false;
-                if (event.type==SDL_MOUSEMOTION) {canvas.mouse_x=event.motion.x;canvas.mouse_y=event.motion.y;}
-                if (event.type==SDL_MOUSEBUTTONDOWN || event.type==SDL_MOUSEBUTTONUP) {
-                    canvas.mouse_x=event.button.x;canvas.mouse_y=event.button.y;
-                    canvas.pressed=event.type==SDL_MOUSEBUTTONDOWN;
-                }
-                if (event.type==SDL_WINDOWEVENT && event.window.event==SDL_WINDOWEVENT_FOCUS_LOST) canvas.pressed=false;
+                canvas.HandlePointerEvent(event);
                 if (event.type==SDL_KEYDOWN && !event.key.repeat) {
                     switch (event.key.keysym.sym) {
                         case SDLK_ESCAPE:running=false;break;

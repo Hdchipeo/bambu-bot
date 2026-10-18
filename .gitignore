@@ -25,3 +25,4 @@ bambu.local.json
 *.pem
 *.key
 simulator/build/
+simulator/build-asan/

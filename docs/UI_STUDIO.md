@@ -25,6 +25,8 @@ Nếu chưa build firmware và chưa có `managed_components/lvgl__lvgl`, CMake 
 
 ## Điều khiển
 
+Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản 0.2.0, thoát cửa sổ cũ rồi mở lại bản 0.2.1; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
+
 | Thao tác | Kết quả |
 | --- | --- |
 | Chọn một emotion bên phải | Đổi mắt, miệng, màu và chuyển động |
@@ -101,6 +103,8 @@ simulator/build/bambu_studio.app/Contents/MacOS/bambu_studio \
 Headless export tạo ảnh toàn studio, bảng 14 emotion và ảnh LCD đúng kích thước. File BMP có thể đổi sang PNG bằng `sips` trên macOS. Các ảnh trong tài liệu được xuất từ chính renderer này.
 
 Đã kiểm tra ngày 18/10/2026: build AppleClang trên nguồn LVGL có sẵn và bản tải sạch từ GitHub; bài smoke test ASan/UBSan cho toàn bộ nút emotion, chuyển màn hình, kích thước tập đối tượng ổn định, offline/stale/unknown, message, motion và alias; thử tương tác chuột/phím trực tiếp trên cửa sổ SDL2. Chưa đo FPS, RAM hay khả năng chạy trên ESP32.
+
+Kiểm tra input của 0.2.1 đưa cặp SDL mouse-down/mouse-up vào cùng một lượt xử lý, đi qua input device LVGL để kiểm chứng hit testing của cả 14 nút emotion, hai nút display, Play/Motion và kéo slider. Bộ kiểm tra cũng xác nhận mất focus hủy lần nhấn và chuột phải không kích hoạt nút. Không gọi thẳng callback `LV_EVENT_CLICKED` để giả định click đã hoạt động.
 
 ## Đóng gói ứng dụng
 
