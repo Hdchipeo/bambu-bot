@@ -8,7 +8,7 @@ namespace bambu::ui {
 namespace {
 constexpr std::array<EmotionInfo, static_cast<size_t>(Emotion::Count)> kInfo{{
     {"Idle", "A quiet companion. Gentle breathing and a curious little blink.", kBambuGreen},
-    {"Listening", "Eyes open, attention on you. A soft blue listening pulse.", 0x73DBF5},
+    {"Listening", "Eyes open, attention on you. A gentle listening pulse.", 0x73DBF5},
     {"Thinking", "A sideways glance and three little moving thoughts.", 0xBAA0F8},
     {"Speaking", "A small animated voice, with a face that stays attentive.", kBambuGreen},
     {"Printing", "Keeping an eye on the job. Progress stays visible below.", kBambuGreen},
@@ -18,7 +18,7 @@ constexpr std::array<EmotionInfo, static_cast<size_t>(Emotion::Count)> kInfo{{
     {"Confused", "An uneven glance. Time to ask a useful follow-up.", 0xE5D5A1},
     {"Sleepy", "Slow breathing, resting eyes. Quiet company after hours.", 0xA5B7DF},
     {"Sad", "Soft eyes, a little tear. Something did not go as planned.", 0x8EBFE8},
-    {"Warning", "Something needs attention. Amber, calm and clearly visible.", 0xF3CE80},
+    {"Warning", "Something needs attention. Alert eyes, calm and clearly visible.", 0xF3CE80},
     {"Error", "The printer reported an error. Distinct eyes, no flashing.", 0xF08E89},
     {"Offline", "Connection is missing. No live values are implied.", 0x8C9F9B},
 }};
@@ -52,10 +52,6 @@ void Visible(lv_obj_t* obj, bool visible) {
     else lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
 }
 float Mix(float a, float b, float fraction) { return a + (b - a) * fraction; }
-uint32_t Tint(uint32_t color, float strength) {
-    auto channel = [strength](uint32_t c) { return static_cast<uint32_t>(c * strength); };
-    return (channel((color >> 16) & 255) << 16) | (channel((color >> 8) & 255) << 8) | channel(color & 255);
-}
 }  // namespace
 
 const EmotionInfo& Describe(Emotion e) {
@@ -89,22 +85,12 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     scale_ = std::min(w / 320.0f, h / 320.0f);
     offset_x_ = (w - S(320)) / 2;
     offset_y_ = (h - S(320)) / 2;
-    root_ = Box(parent, 0x071A14, round ? LV_RADIUS_CIRCLE : 0);
+    root_ = Box(parent, 0x000000, round ? LV_RADIUS_CIRCLE : 0);
     lv_obj_set_size(root_, w, h);
 #if LV_FONT_MONTSERRAT_12 && LV_FONT_MONTSERRAT_14
     lv_obj_set_style_text_font(root_, w<320 ? &lv_font_montserrat_12 : &lv_font_montserrat_14,0);
 #endif
     lv_obj_set_style_clip_corner(root_, true, 0);
-    lv_obj_set_style_bg_grad_color(root_, lv_color_hex(0x0C241B), 0);
-    lv_obj_set_style_bg_grad_dir(root_, LV_GRAD_DIR_VER, 0);
-
-    halo_ = Box(root_, 0x12382A, LV_RADIUS_CIRCLE);
-    Rect(halo_, 40, 61, 240, 240);
-    halo_inner_ = Box(root_, 0x17442F, LV_RADIUS_CIRCLE);
-    Rect(halo_inner_, 58, 78, 204, 204);
-    lv_obj_set_style_bg_grad_color(halo_inner_, lv_color_hex(0x0A281C), 0);
-    lv_obj_set_style_bg_grad_dir(halo_inner_, LV_GRAD_DIR_VER, 0);
-
     ring_ = lv_arc_create(root_);
     lv_obj_set_pos(ring_, offset_x_ + S(7), offset_y_ + S(7));
     lv_obj_set_size(ring_, S(306), S(306));
@@ -119,7 +105,7 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     Visible(ring_, round);
 
     bar_ = lv_bar_create(root_);
-    Rect(bar_, 88, 264, 144, 3);
+    Rect(bar_, 58, 248, 204, 3);
     lv_bar_set_range(bar_, 0, 100);
     lv_obj_set_style_bg_color(bar_, lv_color_hex(0x274839), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar_, LV_OPA_COVER, LV_PART_MAIN);
@@ -150,9 +136,9 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     state_label_ = Label(root_, kBambuGreen);
     Rect(state_label_, 42, round ? 57 : 39, 236, 20);
     progress_label_ = Label(root_, 0xE5F4E8);
-    Rect(progress_label_, 38, round ? 264 : 275, 244, 20);
+    Rect(progress_label_, 38, round ? 264 : 260, 244, 20);
     detail_label_ = Label(root_, 0x90AE9D);
-    Rect(detail_label_, round ? 85 : 35, round ? 280 : 295, round ? 150 : 250, 20);
+    Rect(detail_label_, round ? 85 : 35, round ? 280 : 288, round ? 150 : 250, 20);
     lv_label_set_long_mode(detail_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
     source_label_ = Label(root_, 0x779E88);
     Rect(source_label_, 118, round ? 244 : 242, 84, 18);
@@ -161,13 +147,18 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     temperature_row_ = Box(root_, 0);
     lv_obj_set_style_bg_opa(temperature_row_, LV_OPA_TRANSP, 0);
     Rect(temperature_row_, 85, round ? 280 : 294, 168, 22);
+    if (!round) {
+        lv_obj_set_pos(temperature_row_, 53, 216);
+        lv_obj_set_size(temperature_row_, 176, 22);
+    }
+    auto icon_scale = [&](float value) { return round ? S(value) : static_cast<int>(value); };
     auto icon_line = [&](size_t index, float x, std::initializer_list<lv_point_precise_t> points) {
-        auto line = Line(temperature_row_, std::max(1, S(1.4f)));
-        lv_obj_set_pos(line, S(x), S(1));
+        auto line = Line(temperature_row_, round ? std::max(1, S(1.4f)) : 1);
+        lv_obj_set_pos(line, icon_scale(x), icon_scale(1));
         lv_obj_set_style_line_color(line, lv_color_hex(0xB5D1BF), 0);
         size_t i = 0;
         for (auto point : points) temperature_points_[index][i++] = {
-            static_cast<lv_value_precise_t>(S(point.x)), static_cast<lv_value_precise_t>(S(point.y))};
+            static_cast<lv_value_precise_t>(icon_scale(point.x)), static_cast<lv_value_precise_t>(icon_scale(point.y))};
         lv_line_set_points(line, temperature_points_[index].data(), i);
     };
     // Nozzle: narrow neck, broad shoulder, pointed outlet; heat beneath.
@@ -183,10 +174,11 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
     }
     nozzle_value_ = Label(temperature_row_, 0xB5D1BF);
     bed_value_ = Label(temperature_row_, 0xB5D1BF);
-    lv_obj_set_pos(nozzle_value_, S(24), S(3)); lv_obj_set_size(nozzle_value_, S(58), S(19));
-    lv_obj_set_pos(bed_value_, S(110), S(3)); lv_obj_set_size(bed_value_, S(58), S(19));
+    lv_obj_set_pos(nozzle_value_, icon_scale(24), icon_scale(3)); lv_obj_set_size(nozzle_value_, icon_scale(62), icon_scale(19));
+    lv_obj_set_pos(bed_value_, icon_scale(110), icon_scale(3)); lv_obj_set_size(bed_value_, icon_scale(62), icon_scale(19));
     for (auto value : {nozzle_value_, bed_value_}) lv_obj_set_style_text_align(value, LV_TEXT_ALIGN_LEFT, 0);
 
+    ApplyTheme();
     from_ = to_ = Target(emotion_);
     transition_start_ = lv_tick_get();
     Labels();
@@ -200,6 +192,36 @@ FaceView::FaceView(lv_obj_t* parent, int w, int h, bool round) : round_(round) {
 FaceView::~FaceView() {
     if (timer_) lv_timer_delete(timer_);
     if (root_) lv_obj_delete(root_);
+}
+
+uint32_t FaceView::Ink() const { return theme_==Theme::Black ? kBambuGreen : 0xFFFFFF; }
+void FaceView::SetTheme(Theme theme) {
+    theme_=theme;
+    ApplyTheme();
+    Labels();
+    RenderAt(lv_tick_get());
+}
+void FaceView::ApplyTheme() {
+    const auto ink=lv_color_hex(Ink());
+    lv_obj_set_style_bg_color(root_,lv_color_hex(theme_==Theme::Black ? 0x000000 : kBambuGreen),0);
+    lv_obj_set_style_bg_grad_dir(root_,LV_GRAD_DIR_NONE,0);
+    // Solid backgrounds keep the requested two-color themes exact.
+    for (auto label : {brand_,state_label_,progress_label_,detail_label_,source_label_,nozzle_value_,bed_value_,sleep_label_})
+        lv_obj_set_style_text_color(label,ink,0);
+    for (auto obj : {ear_left_,ear_right_,antenna_,tear_}) lv_obj_set_style_bg_color(obj,ink,0);
+    for (auto obj : dots_) lv_obj_set_style_bg_color(obj,ink,0);
+    for (auto obj : voice_) lv_obj_set_style_bg_color(obj,ink,0);
+    for (auto obj : confetti_) lv_obj_set_style_bg_color(obj,ink,0);
+    lv_obj_set_style_border_color(head_,ink,0);
+    for (auto line : {eye_left_,eye_right_,cross_left_,cross_right_,mouth_}) lv_obj_set_style_line_color(line,ink,0);
+    for (uint32_t i=0;i<lv_obj_get_child_count(temperature_row_);++i) {
+        auto obj=lv_obj_get_child(temperature_row_,static_cast<int>(i));
+        if (lv_obj_check_type(obj,&lv_line_class)) lv_obj_set_style_line_color(obj,ink,0);
+    }
+    lv_obj_set_style_arc_color(ring_,ink,LV_PART_MAIN);
+    lv_obj_set_style_arc_opa(ring_,LV_OPA_20,LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar_,ink,LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(bar_,LV_OPA_20,LV_PART_MAIN);
 }
 
 FaceView::Pose FaceView::Target(Emotion e) {
@@ -262,7 +284,7 @@ void FaceView::SetAnimated(bool animated) {
 }
 void FaceView::SetMinimal(bool minimal) {
     minimal_=minimal;
-    for (auto obj : {brand_,state_label_,progress_label_,source_label_}) Visible(obj,!minimal);
+    for (auto obj : {brand_,state_label_,progress_label_}) Visible(obj,!minimal);
     Labels();
     Visible(bar_,!minimal && !round_);
     Visible(ring_,!minimal && round_);
@@ -271,8 +293,9 @@ void FaceView::SetMinimal(bool minimal) {
 void FaceView::Labels() {
     const auto& info=Describe(emotion_);
     lv_label_set_text(state_label_,info.name);
-    lv_obj_set_style_text_color(state_label_,lv_color_hex(info.accent),0);
+    lv_obj_set_style_text_color(state_label_,lv_color_hex(Ink()),0);
     lv_label_set_text(source_label_, telemetry_.demo ? "DEMO" : "A1 / LAN");
+    Visible(source_label_,!minimal_ && round_);
     const bool live=telemetry_.connected && !telemetry_.stale && emotion_!=Emotion::Offline;
     char first[96],second[96];
     if (!live) {
@@ -295,8 +318,8 @@ void FaceView::Labels() {
     int progress=live && telemetry_.progress>=0 ? telemetry_.progress : 0;
     lv_arc_set_value(ring_,progress);
     lv_bar_set_value(bar_,progress,LV_ANIM_OFF);
-    lv_obj_set_style_arc_color(ring_,lv_color_hex(live?info.accent:0x526B60),LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(bar_,lv_color_hex(live?info.accent:0x526B60),LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(ring_,lv_color_hex(Ink()),LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(bar_,lv_color_hex(Ink()),LV_PART_INDICATOR);
 }
 
 void FaceView::Eye(lv_obj_t* line, std::array<lv_point_precise_t,3>& points,
@@ -318,17 +341,7 @@ void FaceView::RenderAt(uint32_t tick) {
     p.mouth_width=Mix(from_.mouth_width,to_.mouth_width,t);
     p.bob=Mix(from_.bob,to_.bob,t);
     const bool offline=emotion_==Emotion::Offline;
-    const float bob=offline ? 0 : std::sin(time*(emotion_==Emotion::Sleepy?1.3f:2.0f))*1.6f+p.bob;
-    const float breath=offline?0:(std::sin(time*1.6f)+1)*1.8f;
-    const auto accent=Describe(emotion_).accent;
-    lv_obj_set_style_bg_color(halo_,lv_color_hex(Tint(accent,offline?0.10f:0.16f)),0);
-    Rect(halo_,40-breath,61-breath,240+breath*2,240+breath*2);
-    lv_obj_set_style_bg_opa(halo_,offline?LV_OPA_40:LV_OPA_70,0);
-    lv_obj_set_style_bg_color(halo_inner_,lv_color_hex(Tint(accent,offline?0.10f:0.23f)),0);
-    const uint32_t ink=offline?0x77958B:0xEDFFF5;
-    lv_obj_set_style_border_color(head_,lv_color_hex(ink),0);
-    for (auto obj : {ear_left_,ear_right_,antenna_}) lv_obj_set_style_bg_color(obj,lv_color_hex(ink),0);
-    for (auto obj : {eye_left_,eye_right_,mouth_}) lv_obj_set_style_line_color(obj,lv_color_hex(ink),0);
+    const float bob=(offline ? 0 : std::sin(time*(emotion_==Emotion::Sleepy?1.3f:2.0f))*1.6f+p.bob) - (round_ ? 0 : 8);
     Rect(head_,65,101+bob,190,116);
     Rect(ear_left_,54,135+bob,13,42);
     Rect(ear_right_,253,135+bob,13,42);

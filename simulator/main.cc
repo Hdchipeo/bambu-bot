@@ -16,6 +16,7 @@ using bambu::ui::Emotion;
 using bambu::ui::FaceView;
 using bambu::ui::Telemetry;
 using bambu::ui::kBambuGreen;
+using bambu::ui::Theme;
 namespace fs = std::filesystem;
 static_assert(LVGL_VERSION_MAJOR==9 && LVGL_VERSION_MINOR==5 && LVGL_VERSION_PATCH==0,
               "Bambu Bot Studio is tested with LVGL 9.5.0");
@@ -184,6 +185,10 @@ public:
         rect_button_=Button(left,445,14,170,32,"Desk-bot 280 x 240");
         lv_obj_add_event_cb(round_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->SetRound(true);},LV_EVENT_CLICKED,this);
         lv_obj_add_event_cb(rect_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->SetRound(false);},LV_EVENT_CLICKED,this);
+        black_button_=Button(root_,480,37,144,32,"Black / Green");
+        green_button_=Button(root_,636,37,144,32,"Green / White");
+        lv_obj_add_event_cb(black_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->SetTheme(Theme::Black);},LV_EVENT_CLICKED,this);
+        lv_obj_add_event_cb(green_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->SetTheme(Theme::Green);},LV_EVENT_CLICKED,this);
         preview_panel_=left;
         caption_=Label(left,0,550,"",&lv_font_montserrat_12,0x8CA391);
 
@@ -217,9 +222,9 @@ public:
         motion_button_=Button(right,222,493,186,38,"Motion on");
         lv_obj_add_event_cb(play_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->ToggleAuto();},LV_EVENT_CLICKED,this);
         lv_obj_add_event_cb(motion_button_,[](lv_event_t* e){static_cast<Studio*>(lv_event_get_user_data(e))->ToggleMotion();},LV_EVENT_CLICKED,this);
-        Label(right,24,548,"Simulated telemetry. No printer connection.",&lv_font_montserrat_12,0x728D7B);
+        Label(right,24,548,"DEMO data / No printer connection.",&lv_font_montserrat_12,0x728D7B);
         description_=Label(root_,48,710,"",&lv_font_montserrat_12,0x8CA391);
-        Label(root_,744,710,"SPACE  Play   /   R  Display   /   M  Motion",&lv_font_montserrat_12,0x728D7B);
+        Label(root_,700,710,"SPACE Play  /  R Display  /  T Theme  /  M Motion",&lv_font_montserrat_12,0x728D7B);
         SetRound(true);
         Select(0);
     }
@@ -233,14 +238,22 @@ public:
         Border(bezel_,0x354A3B,2);
         face_=std::make_unique<FaceView>(bezel_,w,h,round);
         lv_obj_set_pos(face_->root(),9,9);
+        face_->SetTheme(theme_);
         face_->SetEmotion(static_cast<Emotion>(selected_));
         face_->SetAnimated(motion_);
         Border(round_button_,round?kBambuGreen:0x2A3A31);
         Border(rect_button_,round?0x2A3A31:kBambuGreen);
         lv_label_set_text(caption_,round?"466 x 466 AMOLED  /  Circular safe area":"280 x 240 LCD  /  Desk-bot test hardware");
         lv_obj_align(caption_,LV_ALIGN_BOTTOM_MID,0,-17);
+        SetTheme(theme_);
         UpdateTelemetry();
     }
+    void SetTheme(Theme theme) {
+        theme_=theme; face_->SetTheme(theme);
+        Border(black_button_,theme==Theme::Black?kBambuGreen:0x2A3A31);
+        Border(green_button_,theme==Theme::Green?kBambuGreen:0x2A3A31);
+    }
+    void ToggleTheme() { SetTheme(theme_==Theme::Black?Theme::Green:Theme::Black); }
     void Select(int index) {
         int previous=selected_;
         selected_=(index+kCount)%kCount;
@@ -271,6 +284,8 @@ public:
     void ToggleAuto() { auto_=!auto_; SetButtonText(play_button_,auto_?"Pause sequence":"Play sequence"); last_cycle_=ticks; }
     void ToggleMotion() { motion_=!motion_;face_->SetAnimated(motion_);SetButtonText(motion_button_,motion_?"Motion on":"Motion off"); }
     void Tick() { if (auto_ && ticks-last_cycle_>=3500) Select(selected_+1); }
+    lv_obj_t* black_button() {return black_button_;}
+    lv_obj_t* green_button() {return green_button_;}
     int selected() const {return selected_;}
     bool round() const {return round_;}
     FaceView& face() {return *face_;}
@@ -287,6 +302,8 @@ private:
     static void SetButtonText(lv_obj_t* button,const char* text) {lv_label_set_text(lv_obj_get_child(button,0),text);}
     lv_obj_t *root_=nullptr,*preview_panel_=nullptr,*bezel_=nullptr,*caption_=nullptr,*description_=nullptr;
     lv_obj_t *round_button_=nullptr,*rect_button_=nullptr,*progress_text_=nullptr,*slider_=nullptr,*play_button_=nullptr,*motion_button_=nullptr;
+    lv_obj_t *black_button_=nullptr,*green_button_=nullptr;
+    Theme theme_=Theme::Black;
     std::array<lv_obj_t*,kCount> buttons_{},dots_{};
     std::array<Action,kCount> actions_{};
     std::unique_ptr<FaceView> face_;
@@ -331,6 +348,23 @@ void SelfTest(Canvas& canvas) {
     Require(!studio.round(),"Fast click did not select Desk-bot display");
     FastClick(canvas,studio.round_button());
     Require(studio.round(),"Fast click did not select Round display");
+    for (bool round : {false,true}) {
+        studio.SetRound(round);canvas.Frame(ticks+50);
+        for (Theme theme : {Theme::Green,Theme::Black}) {
+            FastClick(canvas,theme==Theme::Green?studio.green_button():studio.black_button());
+            Require(studio.face().theme()==theme,"Theme button did not change theme");
+            const auto background=lv_color_to_u32(lv_obj_get_style_bg_color(studio.face().root(),LV_PART_MAIN)) & 0xFFFFFF;
+            Require(background==(theme==Theme::Green?kBambuGreen:0),"Theme background color mismatch");
+            for (int i=0;i<kCount;++i) {
+                studio.Select(i);canvas.Frame(ticks+350);
+                Require(studio.face().theme()==theme,"Emotion changed theme");
+                if (!round) Require(AllText(studio.face().root()).find("DEMO")==std::string::npos,"Desk-bot must hide DEMO label");
+            }
+            studio.SetRound(!round);studio.SetRound(round);
+            Require(studio.face().theme()==theme,"Display switch lost selected theme");
+        }
+    }
+    studio.Select(0);
     FastClick(canvas,studio.motion_button());
     Require(!studio.face().animated(),"Mouse motion toggle failed");
     FastClick(canvas,studio.motion_button());
@@ -406,7 +440,7 @@ void SelfTest(Canvas& canvas) {
     const int before_cycle=studio.selected();
     studio.ToggleAuto();canvas.Frame(ticks+3600);studio.Tick();
     Require(studio.selected()==(before_cycle+1)%kCount,"Auto sequence failed");
-    std::cout<<"PASS: fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
+    std::cout<<"PASS: fast SDL clicks on 14 emotions and both displays, batched slider drag, focus-loss cancellation, button filtering, animated transitions, bounded objects, both themes on both displays, compact layout without DEMO, stale/offline/unknown values, messages, reduced motion, aliases and sequence\n";
 }
 
 void Export(Canvas& canvas,const fs::path& output) {
@@ -418,7 +452,11 @@ void Export(Canvas& canvas,const fs::path& output) {
         canvas.SaveLcd(studio.face().root(),output/"lcd-round.bmp");
         studio.SetRound(false); canvas.Frame(ticks+1000); canvas.Save(output/"studio-deskbot.bmp");
         canvas.SaveLcd(studio.face().root(),output/"lcd-deskbot.bmp");
-        studio.SetRound(true);
+        studio.SetTheme(Theme::Green); canvas.Frame(ticks+1000);
+        canvas.Save(output/"studio-deskbot-green.bmp");canvas.SaveLcd(studio.face().root(),output/"lcd-deskbot-green.bmp");
+        studio.SetRound(true);canvas.Frame(ticks+1000);
+        canvas.Save(output/"studio-round-green.bmp");canvas.SaveLcd(studio.face().root(),output/"lcd-round-green.bmp");
+        studio.SetTheme(Theme::Black);
         for (int i=0;i<kCount;++i) {
             studio.Select(i);canvas.Frame(ticks+1000);
             canvas.Save(output/(std::string("emotion-")+Describe(static_cast<Emotion>(i)).name+".bmp"));
@@ -438,7 +476,7 @@ void Export(Canvas& canvas,const fs::path& output) {
         auto dot=Box(sheet,x+67,y+190,8,3,Describe(static_cast<Emotion>(i)).accent,2);(void)dot;
         faces.push_back(std::move(face));
     }
-    Label(sheet,36,692,"White silhouette. Forest greens. A familiar face, with room for a little personality.",&lv_font_montserrat_14,0x88A18D);
+    Label(sheet,36,692,"Bambu Green on black. White on Bambu Green. One face, fourteen emotions.",&lv_font_montserrat_14,0x88A18D);
     canvas.Frame(ticks+1000);canvas.Save(output/"emotion-sheet.bmp");
     faces.clear();lv_obj_delete(sheet);
     std::cout<<"LVGL renders exported to "<<output<<'\n';
@@ -474,6 +512,7 @@ int main(int argc,char** argv) {
                         case SDLK_RIGHT:studio.Select(studio.selected()+1);break;
                         case SDLK_LEFT:studio.Select(studio.selected()-1);break;
                         case SDLK_SPACE:studio.ToggleAuto();break;
+                        case SDLK_t:studio.ToggleTheme();break;
                         case SDLK_r:studio.SetRound(!studio.round());break;
                         case SDLK_m:studio.ToggleMotion();break;
                         default:break;

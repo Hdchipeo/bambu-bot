@@ -12,6 +12,8 @@ namespace bambu::ui {
 // Bambu Studio official splash_logo.svg fill; RGB (0, 174, 66).
 inline constexpr uint32_t kBambuGreen = 0x00AE42;
 
+enum class Theme { Black, Green };
+
 enum class Emotion {
     Idle, Listening, Thinking, Speaking, Printing, Happy, Completed,
     Curious, Confused, Sleepy, Sad, Warning, Error, Offline, Count
@@ -44,6 +46,8 @@ public:
     FaceView& operator=(const FaceView&) = delete;
 
     lv_obj_t* root() const { return root_; }
+    void SetTheme(Theme theme);
+    Theme theme() const { return theme_; }
     void SetEmotion(Emotion emotion);
     Emotion emotion() const { return emotion_; }
     void SetTelemetry(const Telemetry& telemetry);
@@ -66,11 +70,11 @@ private:
     void Eye(lv_obj_t* line, std::array<lv_point_precise_t, 3>& points,
              const std::array<float, 6>& pose, float x, float y, float blink);
     void Labels();
+    void ApplyTheme();
+    uint32_t Ink() const;
     int S(float value) const;
 
     lv_obj_t* root_ = nullptr;
-    lv_obj_t* halo_ = nullptr;
-    lv_obj_t* halo_inner_ = nullptr;
     lv_obj_t* head_ = nullptr;
     lv_obj_t* ear_left_ = nullptr;
     lv_obj_t* ear_right_ = nullptr;
@@ -101,6 +105,7 @@ private:
     std::array<lv_point_precise_t, 3> left_points_{}, right_points_{};
     std::array<lv_point_precise_t, 2> cross_left_points_{}, cross_right_points_{};
     std::array<lv_point_precise_t, 9> mouth_points_{};
+    Theme theme_ = Theme::Black;
     Emotion emotion_ = Emotion::Idle;
     Telemetry telemetry_;
     Pose from_, to_;

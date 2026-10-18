@@ -6,11 +6,11 @@
 
 ## Thiết kế
 
-Lấy cảm hứng từ biểu tượng robot xanh/trắng trong ảnh `IMG_6476.PNG`: đầu chữ nhật bo góc, hai tai, anten bên trái, mắt trái hình dấu `>` và mắt phải hình viên thuốc. Nền xanh rừng giữ độ tương phản với nét trắng; màu phụ thay đổi theo cảm xúc. Chuyển động nhỏ để robot có sức sống mà không làm mất khả năng đọc thông tin máy in.
+Lấy cảm hứng từ biểu tượng robot xanh/trắng trong ảnh `IMG_6476.PNG`: đầu chữ nhật bo góc, hai tai, anten bên trái, mắt trái hình dấu `>` và mắt phải hình viên thuốc. Hai theme dùng nền phẳng: **đen `#000000` / nét xanh Bambu `#00AE42`**, hoặc **xanh Bambu `#00AE42` / nét trắng `#FFFFFF`**. Robot, icon, chữ và các chi tiết emotion tuân theo màu của theme; hình dạng và chuyển động phân biệt cảm xúc. Chuyển động nhỏ để robot có sức sống mà không làm mất khả năng đọc thông tin máy in.
 
 Vẽ bằng `lv_obj`, `lv_line`, `lv_arc`, `lv_bar` và `lv_label`; không cần bitmap, GIF, SVG hay ThorVG. Các mảng điểm vẽ sống cùng component để an toàn với API `lv_line_set_points`. Animation dùng một timer 33 ms và tập đối tượng cố định, không tạo/xóa đối tượng ở mỗi frame.
 
-Màu xanh chính là **Bambu Green `#00AE42` — RGB `(0, 174, 66)`**, đối chiếu trực tiếp từ [logo Bambu Studio chính thức](https://github.com/bambulab/BambuStudio/blob/master/resources/images/splash_logo.svg). Dùng cho logo, điều khiển được chọn, tiến độ và các emotion xanh; màu cảnh báo/lỗi và các emotion khác vẫn phân biệt theo trạng thái. Nền tối là màu hỗ trợ tương phản, không phải mã xanh thương hiệu.
+Màu xanh chính là **Bambu Green `#00AE42` — RGB `(0, 174, 66)`**, đối chiếu trực tiếp từ [logo Bambu Studio chính thức](https://github.com/bambulab/BambuStudio/blob/master/resources/images/splash_logo.svg). Màu này dùng làm nét trên nền đen hoặc nền của theme xanh. Dấu màu phân loại emotion chỉ nằm ở bảng điều khiển Studio.
 
 Từ **0.2.2**, dòng nhiệt độ dùng icon đầu phun và bàn nhiệt thay chữ Nozzle/Bed, kèm giá trị `°C`. Hình vẽ LVGL độc lập theo hình thái của [nozzle](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_nozzle_temp.svg) và [bed](https://github.com/bambulab/BambuStudio/blob/master/resources/images/monitor_bed_temp.svg) trong Bambu Studio: đầu phun hướng xuống, bàn nhiệt có ba vệt nhiệt. Không nhập SVG hoặc mã nguồn Bambu Studio. Mất dữ liệu dùng `-- °C`; offline/stale ẩn dòng nhiệt độ, và thông điệp kích hoạt tạm thay thế dòng này.
 
@@ -29,11 +29,12 @@ Nếu chưa build firmware và chưa có `managed_components/lvgl__lvgl`, CMake 
 
 ## Điều khiển
 
-Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản cũ, thoát cửa sổ cũ rồi mở lại bản **0.2.2**; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
+Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột nằm trong cùng lượt xử lý SDL. Nếu đang mở bản cũ, thoát cửa sổ cũ rồi mở lại bản **0.2.3**; phiên bản hiện trên tiêu đề cửa sổ và góc trên bên phải.
 
 | Thao tác | Kết quả |
 | --- | --- |
-| Chọn một emotion bên phải | Đổi mắt, miệng, màu và chuyển động |
+| Chọn một emotion bên phải | Đổi mắt, miệng và chuyển động; giữ theme đang chọn |
+| Black / Green hoặc Green / White; phím T | Chuyển theme, giữ emotion, tiến độ và motion |
 | Round / Desk-bot | Đổi vùng render thật 466×466 hoặc 280×240 |
 | Thanh Print progress | Đổi dữ liệu giả lập từ 0–100% |
 | Play sequence / Space | Chạy lần lượt các emotion, mỗi 3,5 giây |
@@ -42,18 +43,22 @@ Bản **0.2.1** sửa lỗi bỏ qua click nhanh khi cặp nhấn/thả chuột 
 | Phím trái/phải | Chuyển emotion trước/sau |
 | Escape | Đóng ứng dụng |
 
-Tất cả số liệu đều gắn nhãn **DEMO**. Simulator không kết nối A1, không thu âm và không gọi server AI. Waveform của trạng thái Speaking là animation minh họa, chưa đồng bộ biên độ TTS.
+Số liệu đều là giả lập; bảng điều khiển ghi **DEMO data / No printer connection**. Màn 280×240 đã bỏ nhãn DEMO, nâng khuôn mặt và giãn các hàng tiến độ/nhiệt độ; màn tròn vẫn có nhãn nguồn. Simulator không kết nối A1, không thu âm và không gọi server AI. Waveform của trạng thái Speaking là animation minh họa, chưa đồng bộ biên độ TTS.
 
 ![Round preview](ui/studio-round.png)
 
 ![Desk-bot preview](ui/studio-deskbot.png)
+
+![Green theme, round](ui/lcd-round-green.png)
+
+![Green theme, Desk-bot](ui/lcd-deskbot-green.png)
 
 ## Bộ emotion
 
 | Emotion | Biểu cảm/chuyển động |
 | --- | --- |
 | Idle | Mắt bất đối xứng của biểu tượng gốc; thở và chớp mắt |
-| Listening | Mở mắt cao hơn, sắc xanh lam nhẹ |
+| Listening | Mở mắt cao hơn, nhịp lắng nghe nhẹ |
 | Thinking | Liếc nhẹ; ba chấm chuyển động trên đầu |
 | Speaking | Năm thanh sóng thay cho miệng |
 | Printing | Giữ khuôn mặt quen thuộc và tiến độ in |
@@ -63,11 +68,11 @@ Tất cả số liệu đều gắn nhãn **DEMO**. Simulator không kết nối
 | Confused | Một mắt nghiêng, miệng hơi lệch |
 | Sleepy | Mắt khép, nhịp thở chậm và chữ z |
 | Sad | Mắt trĩu, miệng buồn, một giọt nước mắt |
-| Warning | Mắt dựng, sắc hổ phách |
-| Error | Mắt chữ X, màu đỏ dịu; không nhấp nháy cảnh báo |
+| Warning | Mắt dựng, trạng thái Warning rõ ràng |
+| Error | Mắt chữ X; không nhấp nháy cảnh báo |
 | Offline | Mắt ngang, nét mờ và thông báo mất kết nối; ẩn số liệu sống |
 
-Emotion có chuyển hình dạng mắt/miệng trong 280 ms. Khi chuyển liên tiếp, animation bắt đầu từ hình dạng hiện tại, tránh nhảy về tư thế ban đầu. Màu trạng thái đổi ngay để dễ nhận biết. Trường thiếu dùng `--`; kết nối thiếu hoặc dữ liệu stale không hiển thị các số đo như dữ liệu hiện tại.
+Emotion có chuyển hình dạng mắt/miệng trong 280 ms. Khi chuyển liên tiếp, animation bắt đầu từ hình dạng hiện tại, tránh nhảy về tư thế ban đầu. Theme giữ nguyên khi emotion thay đổi. Trường thiếu dùng `--`; kết nối thiếu hoặc dữ liệu stale không hiển thị các số đo như dữ liệu hiện tại.
 
 ## Component dùng lại cho LCD
 
@@ -76,6 +81,7 @@ Emotion có chuyển hình dạng mắt/miệng trong 280 ms. Khi chuyển liên
 ```cpp
 // Chỉ gọi trong LVGL thread hoặc khi đã giữ khóa LVGL.
 bambu::ui::FaceView face(parent, 280, 240, false);
+face.SetTheme(bambu::ui::Theme::Green); // Hoặc Theme::Black
 face.SetEmotion(bambu::ui::Emotion::Listening);
 
 bambu::ui::Telemetry status;
@@ -109,6 +115,8 @@ Headless export tạo ảnh toàn studio, bảng 14 emotion và ảnh LCD đúng
 Đã kiểm tra ngày 18/10/2026: build AppleClang trên nguồn LVGL có sẵn và bản tải sạch từ GitHub; bài smoke test ASan/UBSan cho toàn bộ nút emotion, chuyển màn hình, kích thước tập đối tượng ổn định, offline/stale/unknown, message, motion và alias; thử tương tác chuột/phím trực tiếp trên cửa sổ SDL2. Chưa đo FPS, RAM hay khả năng chạy trên ESP32.
 
 Kiểm tra input của 0.2.1 đưa cặp SDL mouse-down/mouse-up vào cùng một lượt xử lý, đi qua input device LVGL để kiểm chứng hit testing của cả 14 nút emotion, hai nút display, Play/Motion và kéo slider. Bộ kiểm tra cũng xác nhận mất focus hủy lần nhấn và chuột phải không kích hoạt nút. Không gọi thẳng callback `LV_EVENT_CLICKED` để giả định click đã hoạt động.
+
+Bản 0.2.3 bổ sung kiểm tra click hai nút theme trên cả hai loại màn hình, giữ theme khi đổi display/emotion, màu nền chính xác và ẩn DEMO trên Desk-bot. Các giá trị thiếu, offline và thông điệp vẫn được kiểm tra trong smoke test.
 
 ## Đóng gói ứng dụng
 
