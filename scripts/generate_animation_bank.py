@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build lossless RGB565/zlib animation assets from --export-animations streams.
+"""Build lossless dual-theme palette/zlib animation assets from --export-animations streams.
 Requires numpy for offline generation only. No firmware/network configuration is read.
 """
 import argparse
@@ -24,6 +24,7 @@ def main():
     parser.add_argument('sources',type=Path)
     args=parser.parse_args()
     clips=[]
+    max_palette_colors=0
     for clip_id,name in enumerate(SCENES+EMOTIONS):
         n=150 if clip_id==1 else 88
         themes=[np.fromfile(args.sources/f'clip-{clip_id:02d}-{theme}.rgb565',dtype='<u2').reshape(n,240,280)
@@ -42,13 +43,25 @@ def main():
         # One fixed fit for every frame/theme prevents pumping or jitter at crop changes.
         xi=np.minimum(w-1,((np.arange(dw)+.5)*w/dw).astype(int))+x0
         yi=np.minimum(h-1,((np.arange(dh)+.5)*h/dh).astype(int))+y0
-        for theme,frames in enumerate(themes):
-            encoded=[]
-            for frame in frames:
-                raw=np.ascontiguousarray(frame[yi[:,None],xi[None,:]],dtype='<u2').tobytes()
-                compressed=zlib.compress(raw,9)
-                assert zlib.decompress(compressed)==raw
-                encoded.append(compressed)
+        encoded=[]
+        for frame_id in range(n):
+            raw=[np.ascontiguousarray(frames[frame_id][yi[:,None],xi[None,:]],dtype='<u2')
+                 for frames in themes]
+            # Identical geometry shares indices; each palette entry preserves both
+            # theme colors exactly. No quantization or temporal dependencies.
+            pairs=raw[0].astype(np.uint32).ravel() | (raw[1].astype(np.uint32).ravel()<<16)
+            colors,indices=np.unique(pairs,return_inverse=True)
+            max_palette_colors=max(max_palette_colors,len(colors))
+            assert 0<len(colors)<=1024, 'Dual-theme palette exceeds decoder limit'
+            packed=(struct.pack('<H',len(colors))+colors.astype('<u4').tobytes()
+                    +indices.astype('u1' if len(colors)<=256 else '<u2').tobytes())
+            compressed=zlib.compress(packed,9)
+            assert zlib.decompress(compressed)==packed
+            for theme in (0,1):
+                restored=((colors[indices]>>(16*theme))&65535).astype('<u2').tobytes()
+                assert restored==raw[theme].tobytes()
+            encoded.append(compressed)
+        for theme in (0,1):
             clips.append(dict(id=clip_id,name=name,kind='scene' if clip_id<18 else 'emotion',theme=theme,
                               x=x,y=y,w=dw,h=dh,frames=n,intro=24,frame_ms=50,source_scale=scale,data=encoded))
         print(f'Packed {clip_id+1}/32 {name}',flush=True)
@@ -70,15 +83,16 @@ def main():
         table.extend(refs)
         manifest.append({k:v for k,v in c.items() if k!='data'})
     max_pixels=max(c['w']*c['h'] for c in clips)
-    bank=struct.pack('<8s6I',b'BBANIM02',2,len(clips),base+len(payload),max_pixels,ENTRY,0)+directory+table+payload
+    bank=struct.pack('<8s6I',b'BBANIM03',3,len(clips),base+len(payload),max_pixels,ENTRY,max_palette_colors)+directory+table+payload
     assert len(bank)==base+len(payload)
     assert len(bank)<7*1024*1024,'Animation bank leaves insufficient room for speech assets'
     dest=ROOT/'ui/animation_assets/animations.bba'
     dest.parent.mkdir(exist_ok=True)
     dest.write_bytes(bank)
-    summary=dict(version=2,scenes=18,emotions=14,themes=2,bytes=len(bank),max_pixels=max_pixels,
-                 double_buffer_bytes=max_pixels*4,unique_frames=len(unique),stored_frame_references=sum(c['frames'] for c in clips),
-                 sha256=hashlib.sha256(bank).hexdigest(),codec='independent zlib RGB565 little-endian',clips=manifest)
+    summary=dict(version=3,scenes=18,emotions=14,themes=2,bytes=len(bank),max_pixels=max_pixels,
+                 double_buffer_bytes=max_pixels*4,decode_scratch_bytes=max_pixels*(1 if max_palette_colors<=256 else 2)+2+4*max_palette_colors,
+                 max_palette_colors=max_palette_colors,unique_frames=len(unique),stored_frame_references=sum(c['frames'] for c in clips),
+                 sha256=hashlib.sha256(bank).hexdigest(),codec='independent zlib dual-theme lossless RGB565 palette',clips=manifest)
     (ROOT/'ui/assets/animation_bank.json').write_text(json.dumps(summary,indent=2)+'\n')
     print(json.dumps({k:v for k,v in summary.items() if k!='clips'},indent=2))
 

@@ -50,13 +50,13 @@ Speaking là waveform minh họa dựng sẵn, chưa đồng bộ biên độ â
 
 | Thành phần | Dung lượng / hành vi |
 | --- | --- |
-| Bank `animations.bba` | **5.533.517 byte (~5,28 MiB)**, trong phân vùng assets có sẵn |
-| Nội dung | 32 clip × 2 theme, **5.756 tham chiếu frame**, 5.228 frame nén duy nhất |
+| Bank `animations.bba` | **3.602.446 byte (~3,44 MiB)**, trong phân vùng assets có sẵn |
+| Nội dung | 32 clip × 2 theme, **5.756 tham chiếu frame**, 2.614 frame nén dùng chung hai theme |
 | Hai buffer RGB565 dùng chung | **136.160 byte (~133 KiB)** sau khi cả hai được sử dụng; không tăng theo số cảnh |
+| Scratch giải mã palette | **34.886 byte (~34 KiB)** dùng lại giữa các frame, ngoài hai buffer RGB565 |
 | Bộ giải nén ESP32-S3 | `tinfl_decompress` trong ROM, một state tái sử dụng trên heap/PSRAM; không đặt inflater lớn trên stack LVGL |
 | SPI LCD | Hai buffer DMA 280×20 RGB565; giữ pinout và driver ST7789 |
-| Firmware demo đã build | App **0x2ba530 byte**, còn **31%** phân vùng ứng dụng |
-| Assets đã build, gồm model/font/emoji/bank | **6.734.412 byte**, vừa phân vùng assets **8 MiB** hiện tại |
+| Build custom wake word + MN7 English | App **0x354250 byte**, còn **15%** slot ứng dụng; assets **7.284.197 byte**, còn **1.104.411 byte** phân vùng 8 MiB |
 
 Bank được memory-map từ flash, không chép toàn bộ vào PSRAM. Hai buffer màu/depth
 và pool hình học của renderer dự phòng vẫn tồn tại, ngoài bộ đệm phát animation.
@@ -65,8 +65,11 @@ LAN cá nhân trong bản demo công khai.
 
 Mỗi clip có 24 frame mở đầu, dài 1,2 giây. Coffee có vòng lặp 126 frame (6,3 giây);
 các clip khác có 64 frame (3,2 giây). Source animation dùng chung chu kỳ hình học
-để khớp vòng lặp. Frame được nén zlib độc lập từ RGB565; bỏ frame trễ theo thời gian
-thay vì tạo hàng đợi. Giải nén trực tiếp vào buffer không đang hiển thị.
+để khớp vòng lặp. Bank v3 lưu bảng màu RGB565 cho cả hai theme và một luồng chỉ số chung, nén zlib
+độc lập từng frame. Đây là nén **không mất dữ liệu**: giữ nguyên từng pixel, crop,
+số frame và thời lượng của bank v2. Decoder vẫn đọc được bank v2. Khi phát,
+giải nén vào scratch dùng lại rồi tra bảng màu vào buffer RGB565; bỏ frame trễ theo thời gian
+thay vì tạo hàng đợi. Chỉ ghi vào buffer không đang hiển thị.
 
 Vùng hình học được tính một lần cho cả clip và hai theme. Nếu cần, toàn bộ vùng
 được thu nhỏ/đặt lại đồng nhất để vừa giữa tiêu đề và HUD (y=44…195), tránh crop
@@ -122,7 +125,7 @@ chính hình học của simulator, không thu HUD, mạng, mic hay cấu hình 
 Manifest: [animation_bank.json](../ui/assets/animation_bank.json).
 `SceneView::EnableAllPlayback(false)` chọn renderer mesh để so sánh hoặc xuất source.
 Hai clip PackBits cũ giữ trong source để tái tạo/kiểm tra bản thử trước; chúng không
-còn được link vào firmware 0.4.0. Bộ mới dùng RGB565/zlib trong assets.
+còn được link vào firmware 0.4.0. Bộ mới dùng palette RGB565 hai theme/zlib trong assets.
 
 Kiểm thử Release và ASan/UBSan bao phủ tất cả 5.756 frame, dữ liệu lỗi/cắt cụt,
 vòng lặp, 32 clip ở hai theme, đổi cảnh nhiều lần với RAM/widget có giới hạn,
@@ -150,3 +153,36 @@ python3 scripts/verify_animation_assets.py build/generated_assets.bin
 
 Các file `._*.png` trên volume macOS cũng đã được lọc khỏi index emoji; đó là
 metadata AppleDouble, không phải ảnh emotion và không phải số đo FPS.
+
+
+## Custom wake word và MultiNet
+
+Với Desk-bot ESP32-S3 / 8 MiB PSRAM, ưu tiên **MN7 English** khi dùng custom wake
+word theo tiếng Anh. MN5 Q8 giảm RAM nhưng chất lượng nhận dạng thấp hơn; MN6
+không phải lựa chọn tiết kiệm hơn MN7 trong benchmark Espressif:
+
+| Model | Internal RAM | PSRAM | Thời gian / frame âm thanh 32 ms |
+| --- | --- | --- | --- |
+| MN5 Q8 | 16 KB | 2.310 KB | 12 ms |
+| MN6 | 32 KB | 4.100 KB | 12 ms |
+| MN7 | 18 KB | 2.920 KB | 11 ms |
+
+[Nguồn benchmark Espressif](https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/benchmark/README.html).
+Đây là số tham khảo của hãng, không phải phép đo trên Desk-bot. PSRAM trong bảng
+là bộ nhớ khi chạy, **khác** dung lượng model trong flash. MultiNet nhận lệnh
+English/Chinese; không phải model tiếng Việt. Cụm “bam bu” cần thử nhận dạng thực
+tế, đặc biệt khi máy in/quạt chạy. AI đàm thoại tiếng Việt dùng dịch vụ riêng.
+
+Bank cũ 5.533.517 byte cộng model MN7 và font tạo assets 9.215.268 byte, vượt
+phân vùng 8 MiB 826.660 byte. Bank v3 giảm 1.931.071 byte mà giữ toàn bộ cảnh,
+hai theme và nhịp mục tiêu 20 FPS. Build MN7 sau tối ưu: assets **7.284.197 byte**,
+còn **1.104.411 byte**. Không cần tắt MN7, xoá cảnh hoặc đổi partition.
+Phải nạp **app và generated_assets.bin cùng bản** để app có decoder v3.
+Chưa có phép đo FPS LCD khi chạy đồng thời MN7; cần kiểm tra sau khi nạp.
+
+Định dạng bank v3: header `BBANIM03`, version 3, trường cuối header là số màu
+palette tối đa (hiện 211). Mỗi frame giải nén thành `uint16_le color_count`,
+`color_count` cặp RGB565 little-endian (đen trước, xanh sau), rồi chỉ số pixel
+8 bit nếu ≤256 màu, 16 bit nếu nhiều hơn. Frame table của hai theme trỏ chung
+payload. Không có phụ thuộc frame trước, nên bỏ frame trễ/seek vẫn độc lập.
+Parser giới hạn palette ≤1024 màu, kiểm tra kích thước và từng chỉ số trước khi dùng.

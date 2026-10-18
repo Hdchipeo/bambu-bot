@@ -1,15 +1,17 @@
 {
-  "version": 2,
+  "version": 3,
   "scenes": 18,
   "emotions": 14,
   "themes": 2,
-  "bytes": 5533517,
+  "bytes": 3602446,
   "max_pixels": 34040,
   "double_buffer_bytes": 136160,
-  "unique_frames": 5228,
+  "decode_scratch_bytes": 34886,
+  "max_palette_colors": 211,
+  "unique_frames": 2614,
   "stored_frame_references": 5756,
-  "sha256": "7f5b65aaf5c2e8b50e5ae80298fc4bb5b16eb327f6d7f3e2029bdafce6e63bdf",
-  "codec": "independent zlib RGB565 little-endian",
+  "sha256": "5cfa0580d6c8bc3ccadc61221c5004eb312f6badf759b99daf90a7b17ffe20ab",
+  "codec": "independent zlib dual-theme lossless RGB565 palette",
   "clips": [
     {
       "id": 0,

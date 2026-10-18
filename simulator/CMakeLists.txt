@@ -50,14 +50,20 @@ set_target_properties(bambu_studio PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
 
+add_executable(animation_bank_test ../tests/animation_bank_test.cc ../ui/animation_bank.cc)
+target_include_directories(animation_bank_test PRIVATE ../ui)
+target_link_libraries(animation_bank_test PRIVATE ZLIB::ZLIB)
+
 if(BAMBU_SANITIZERS)
-    foreach(target bambu_lvgl bambu_face bambu_studio)
+    foreach(target bambu_lvgl bambu_face bambu_studio animation_bank_test)
         target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
     endforeach()
     target_link_options(bambu_studio PRIVATE -fsanitize=address,undefined)
+    target_link_options(animation_bank_test PRIVATE -fsanitize=address,undefined)
 endif()
 
 enable_testing()
+add_test(NAME animation-codec COMMAND animation_bank_test)
 add_test(NAME emotion-studio-smoke COMMAND bambu_studio --self-test)
 set_tests_properties(emotion-studio-smoke PROPERTIES TIMEOUT 180)
 

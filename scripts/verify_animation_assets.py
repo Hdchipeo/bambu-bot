@@ -11,14 +11,15 @@ ROOT=Path(__file__).resolve().parents[1]
 def verify_bank(data):
     manifest=json.loads((ROOT/'ui/assets/animation_bank.json').read_text())
     digest=hashlib.sha256(data).hexdigest()
-    if len(data)!=manifest['bytes'] or digest!=manifest['sha256'] or data[:8]!=b'BBANIM02':
+    if len(data)!=manifest['bytes'] or digest!=manifest['sha256'] or data[:8]!=b'BBANIM03':
         raise ValueError('Animation bank differs from the source manifest; regenerate/rebuild assets')
     return {key:manifest[key] for key in ('version','bytes','sha256','scenes','emotions','themes','double_buffer_bytes')}
 
 def verify_assets(path):
     data=Path(path).read_bytes()
     if len(data)>8*1024*1024 or len(data)<12:
-        raise ValueError('Assets image does not fit the existing 8 MiB partition')
+        raise ValueError(f'Assets image is {len(data):,} bytes; the 8 MiB partition allows {8*1024*1024:,} bytes '
+                         f'(excess: {max(0,len(data)-8*1024*1024):,}). Reduce model/animation assets and rebuild; do not bypass this check.')
     count,checksum,length=struct.unpack_from('<III',data)
     if count>4096 or 12+count*44>len(data) or length!=len(data)-12 or (sum(data[12:])&0xFFFF)!=checksum:
         raise ValueError('Invalid assets image header/table/checksum')
