@@ -1,0 +1,8 @@
+{
+  "demo": true,
+  "host": "",
+  "serial": "",
+  "access_code": "",
+  "ca_file": "printer-ca.pem",
+  "ota_url": ""
+}
