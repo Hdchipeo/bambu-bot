@@ -3,6 +3,7 @@
 
 
 #include "protocol.h"
+#include "udp_audio_rx.h"
 #include <mqtt.h>
 #include <udp.h>
 #include <cJSON.h>
@@ -50,7 +51,11 @@ private:
     std::string udp_server_;
     int udp_port_;
     uint32_t local_sequence_;
-    uint32_t remote_sequence_;
+    bambu::audio::UdpAudioSequence audio_rx_;
+    uint32_t invalid_audio_packets_=0;
+    uint32_t last_audio_report_ms_=0;
+    bool audio_rx_anomaly_=false;
+    void ReportAudioRx(bool force=false);
     esp_timer_handle_t reconnect_timer_;
 
     bool StartMqttClient(bool report_error=false);

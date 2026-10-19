@@ -7,6 +7,7 @@
 #include <esp_timer.h>
 
 #include <string>
+#include <atomic>
 #include <mutex>
 #include <deque>
 #include <memory>
@@ -148,6 +149,7 @@ private:
     void TickProactiveVoice();
     void CancelProactiveVoice(bool close_channel);
 
+    std::atomic<uint32_t> audio_rx_queue_drops_{0};
     bool has_server_time_ = false;
     bool aborted_ = false;
     bool assets_version_checked_ = false;

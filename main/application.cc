@@ -269,6 +269,8 @@ void Application::Run() {
             // Print debug info every 10 seconds
             if (clock_ticks_ % 10 == 0) {
                 SystemInfo::PrintHeapStats();
+                const auto drops=audio_rx_queue_drops_.exchange(0);
+                if(drops)ESP_LOGW(TAG,"Audio RX decode_queue_drops=%lu in last 10 seconds",static_cast<unsigned long>(drops));
             }
         }
     }
@@ -512,7 +514,7 @@ void Application::InitializeProtocol() {
     
     protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
         if (GetDeviceState() == kDeviceStateSpeaking) {
-            audio_service_.PushPacketToDecodeQueue(std::move(packet));
+            if(!audio_service_.PushPacketToDecodeQueue(std::move(packet)))++audio_rx_queue_drops_;
         }
     });
     

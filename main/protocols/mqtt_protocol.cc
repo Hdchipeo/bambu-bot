@@ -193,6 +193,7 @@ void MqttProtocol::CloseAudioChannel(bool send_goodbye) {
     {
         std::lock_guard<std::mutex> lock(channel_mutex_);
         udp_.reset();
+        ReportAudioRx(true); // Receive task has stopped; counters can now be read safely.
     }
 
     ESP_LOGI(TAG, "Closing audio channel, send_goodbye: %d", send_goodbye);
@@ -246,28 +247,21 @@ bool MqttProtocol::OpenAudioChannel() {
          * |type 1u|flags 1u|payload_len 2u|ssrc 4u|timestamp 4u|sequence 4u|
          * |payload payload_len|
          */
-        if (data.size() < sizeof(aes_nonce_)) {
-            ESP_LOGE(TAG, "Invalid audio packet size: %u", data.size());
-            return;
+        bambu::audio::UdpAudioHeader header;
+        if(aes_nonce_.size()!=bambu::audio::UdpAudioHeader::kBytes ||
+           !bambu::audio::UdpAudioHeader::Parse(reinterpret_cast<const uint8_t*>(data.data()),data.size(),header)){
+            ++invalid_audio_packets_;audio_rx_anomaly_=true;ReportAudioRx();return;
         }
-        if (data[0] != 0x01) {
-            ESP_LOGE(TAG, "Invalid audio packet type: %x", data[0]);
-            return;
+        const auto timestamp=header.timestamp;
+        const auto previous_gaps=audio_rx_.gap_events;
+        if(!audio_rx_.Accept(header.sequence)){
+            audio_rx_anomaly_=true;ReportAudioRx();return;
         }
-        uint32_t timestamp = ntohl(*(uint32_t*)&data[8]);
-        uint32_t sequence = ntohl(*(uint32_t*)&data[12]);
-        if (sequence < remote_sequence_) {
-            ESP_LOGW(TAG, "Received audio packet with old sequence: %lu, expected: %lu", sequence, remote_sequence_);
-            return;
-        }
-        if (sequence != remote_sequence_ + 1) {
-            ESP_LOGW(TAG, "Received audio packet with wrong sequence: %lu, expected: %lu", sequence, remote_sequence_ + 1);
-        }
-
-        size_t decrypted_size = data.size() - aes_nonce_.size();
+        const size_t decrypted_size=header.payload_bytes;
         size_t nc_off = 0;
         uint8_t stream_block[16] = {0};
-        auto nonce = (uint8_t*)data.data();
+        uint8_t nonce[16];
+        std::memcpy(nonce,data.data(),sizeof(nonce));
         auto encrypted = (uint8_t*)data.data() + aes_nonce_.size();
         auto packet = std::make_unique<AudioStreamPacket>();
         packet->sample_rate = server_sample_rate_;
@@ -282,11 +276,14 @@ bool MqttProtocol::OpenAudioChannel() {
         if (on_incoming_audio_ != nullptr) {
             on_incoming_audio_(std::move(packet));
         }
-        remote_sequence_ = sequence;
+        if(audio_rx_.gap_events!=previous_gaps)audio_rx_anomaly_=true;
+        ReportAudioRx();
         last_incoming_time_ = std::chrono::steady_clock::now();
     });
 
-    udp_->Connect(udp_server_, udp_port_);
+    if(!udp_->Connect(udp_server_, udp_port_)){
+        udp_.reset();SetError(Lang::Strings::SERVER_NOT_CONNECTED);return false;
+    }
 
     if (on_audio_channel_opened_ != nullptr) {
         on_audio_channel_opened_();
@@ -361,7 +358,8 @@ void MqttProtocol::ParseServerHello(const cJSON* root) {
     mbedtls_aes_init(&aes_ctx_);
     mbedtls_aes_setkey_enc(&aes_ctx_, (const unsigned char*)DecodeHexString(key).c_str(), 128);
     local_sequence_ = 0;
-    remote_sequence_ = 0;
+    audio_rx_={};invalid_audio_packets_=0;audio_rx_anomaly_=false;
+    last_audio_report_ms_=esp_timer_get_time()/1000;
     xEventGroupSetBits(event_group_handle_, MQTT_PROTOCOL_SERVER_HELLO_EVENT);
 }
 
@@ -386,4 +384,18 @@ std::string MqttProtocol::DecodeHexString(const std::string& hex_string) {
 
 bool MqttProtocol::IsAudioChannelOpened() const {
     return udp_ != nullptr && !error_occurred_ && !IsTimeout();
+}
+
+
+void MqttProtocol::ReportAudioRx(bool force){
+    const uint32_t now=esp_timer_get_time()/1000;
+    if(!force && uint32_t(now-last_audio_report_ms_)<5000)return;
+    last_audio_report_ms_=now;
+    if(audio_rx_anomaly_){
+        ESP_LOGW(TAG,"Audio RX totals: received=%lu gap_events=%lu gap_packets=%lu late_or_duplicate=%lu invalid=%lu",
+            static_cast<unsigned long>(audio_rx_.received),static_cast<unsigned long>(audio_rx_.gap_events),
+            static_cast<unsigned long>(audio_rx_.gap_packets),static_cast<unsigned long>(audio_rx_.late_or_duplicate),
+            static_cast<unsigned long>(invalid_audio_packets_));
+        audio_rx_anomaly_=false;
+    }
 }
