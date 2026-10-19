@@ -9,6 +9,8 @@
 #include <esp_app_desc.h>
 #include <esp_ota_ops.h>
 #include <esp_pm.h>
+#include <esp_heap_caps.h>
+#include <cstdlib>
 #if CONFIG_IDF_TARGET_ESP32P4
 #include "esp_wifi_remote.h"
 #endif
@@ -149,8 +151,27 @@ void SystemInfo::PrintHeapStats() {
     int free_sram = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     int min_free_sram = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
     ESP_LOGI(TAG, "free sram: %u minimal sram: %u", free_sram, min_free_sram);
+#ifdef BAMBU_CRASH_DIAGNOSTICS
+    ESP_LOGI(TAG,"heap diag: largest_internal_8bit=%u free_psram=%u min_psram=%u largest_psram=%u",
+        unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT)),
+        unsigned(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),unsigned(heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM)),
+        unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM)));
+    if(!heap_caps_check_integrity_all(true)){
+        ESP_LOGE(TAG,"Heap integrity failed; aborting near the first detected corruption");abort();
+    }
+#endif
 }
 
 void SystemInfo::PrintPmLocks() {
     esp_pm_dump_locks(stdout);
+}
+
+void SystemInfo::InitializeCrashDiagnostics(){
+#ifdef BAMBU_CRASH_DIAGNOSTICS
+    ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback([](size_t bytes,uint32_t caps,const char* function){
+        // The failure callback must not allocate; use the early/ROM logging path.
+        ESP_EARLY_LOGE("HeapDiag","allocation failed: bytes=%u caps=0x%lx caller=%s",unsigned(bytes),static_cast<unsigned long>(caps),function?function:"unknown");
+    }));
+    ESP_LOGW(TAG,"Crash diagnostics ON: heap integrity + SRAM/PSRAM metrics; retain matching private ELF");
+#endif
 }

@@ -9,7 +9,7 @@
 [![ESP32-S3](https://img.shields.io/badge/Target-ESP32--S3-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-5.5.4-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://github.com/espressif/esp-idf)
 [![LVGL](https://img.shields.io/badge/UI-LVGL_9.5.0-00AE42?style=flat-square)](https://lvgl.io/)
-[![Firmware](https://img.shields.io/badge/Firmware-v0.5.3-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
+[![Firmware](https://img.shields.io/badge/Firmware-v0.5.4-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
 [![Host Tests](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml)
 [![Simulator](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
@@ -191,7 +191,7 @@ LCD **280×240** dùng frame dựng sẵn thay cho dựng hình 3D mỗi frame t
 | **Ba câu thoại mô phỏng** | **90.222 byte** trong assets, Opus 16 kHz / 60 ms |
 | **Scratch giải mã palette** | **34.886 byte**, dùng lại giữa các frame |
 | **Assets với custom wake word + MN7 English** | **7.374.642 byte**, còn **1.013.966 byte** trong phân vùng 8 MiB |
-| **App cùng cấu hình MN7** | **0x359490 byte**, còn **15%** slot ứng dụng |
+| **App chẩn đoán cùng cấu hình MN7** | **0x35a2a0 byte**, còn **15%** slot ứng dụng |
 | **Nhịp phát mục tiêu** | **50 ms/frame → 20 FPS**; chưa đo FPS LCD khi chạy đồng thời MN7 |
 | **Dự phòng** | Thiếu/hỏng bank → renderer CPU 140×120, target 100 ms/frame |
 
@@ -287,6 +287,7 @@ bambu-bot/
 | Tài liệu | Nội dung |
 | :--- | :--- |
 | [Emotion Studio](docs/UI_STUDIO.md) | Chạy simulator, chọn màn hình, emotion và theme |
+| [Chẩn đoán crash MN7](docs/CRASH_DIAGNOSTICS.md) | ELF khớp SHA, heap/PSRAM/stack và build chẩn đoán 0.5.4 |
 | [Âm thanh MQTT/UDP](docs/AUDIO_TRANSPORT.md) | Sequence gaps, bộ đệm RX và thống kê chẩn đoán 0.5.3 |
 | [Voice, HMS & Wiki RAG](docs/VOICE_HMS_RAG.md) | Cơ chế Opus, chính sách thông báo, backend Mac và prompt MCP |
 | [Animation bank](docs/ANIMATION_BANK.md) | Preview, codec v3, ngân sách bộ nhớ và chọn MultiNet |

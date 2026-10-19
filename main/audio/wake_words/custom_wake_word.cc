@@ -116,7 +116,16 @@ bool CustomWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list) 
     }
 
     multinet_ = esp_mn_handle_from_name(mn_name_);
+    if(!multinet_ || commands_.empty() || commands_.size()>ESP_MN_MAX_PHRASE_NUM){
+        ESP_LOGE(TAG,"Invalid MultiNet interface/command list");return false;
+    }
     multinet_model_data_ = multinet_->create(mn_name_, duration_);
+    if(!multinet_model_data_){ESP_LOGE(TAG,"Cannot allocate MultiNet model");return false;}
+    const int chunk_size=multinet_->get_samp_chunksize(multinet_model_data_);
+    if(chunk_size<=0 || chunk_size>16000){
+        ESP_LOGE(TAG,"Invalid MultiNet chunk size: %d",chunk_size);
+        multinet_->destroy(multinet_model_data_);multinet_model_data_=nullptr;return false;
+    }
     multinet_->set_det_threshold(multinet_model_data_, threshold_);
     esp_mn_commands_clear();
     for (int i = 0; i < commands_.size(); i++) {
@@ -133,6 +142,7 @@ void CustomWakeWord::OnWakeWordDetected(std::function<void(const std::string& wa
 }
 
 void CustomWakeWord::Start() {
+    std::lock_guard<std::mutex> lock(input_buffer_mutex_);
     running_ = true;
 }
 
@@ -170,9 +180,26 @@ void CustomWakeWord::Feed(const std::vector<int16_t>& data) {
         
         esp_mn_state_t mn_state = multinet_->detect(multinet_model_data_, chunk.data());
         
+#ifdef BAMBU_CRASH_DIAGNOSTICS
+        ++diagnostic_chunks_;
+        if(mn_state==ESP_MN_STATE_TIMEOUT)++diagnostic_timeouts_;
+        const int64_t now_ms=esp_timer_get_time()/1000;
+        if(now_ms-diagnostic_last_ms_>=60000){
+            diagnostic_last_ms_=now_ms;
+            ESP_LOGI(TAG,"MN diagnostics: model=%s chunks=%lu timeouts=%lu frame_samples=%d feed_stack_hwm=%u",
+                mn_name_,static_cast<unsigned long>(diagnostic_chunks_),static_cast<unsigned long>(diagnostic_timeouts_),chunksize,unsigned(uxTaskGetStackHighWaterMark(nullptr)));
+        }
+#endif
         if (mn_state == ESP_MN_STATE_DETECTED) {
             esp_mn_results_t *mn_result = multinet_->get_results(multinet_model_data_);
+            if(!mn_result || mn_result->num<0 || mn_result->num>ESP_MN_RESULT_MAX_NUM){
+                ESP_LOGE(TAG,"Invalid MultiNet recognition result");multinet_->clean(multinet_model_data_);
+                input_buffer_.clear();return;
+            }
             for (int i = 0; i < mn_result->num && running_; i++) {
+                if(mn_result->command_id[i]<=0 || size_t(mn_result->command_id[i])>commands_.size()){
+                    ESP_LOGE(TAG,"Invalid MultiNet command id: %d",mn_result->command_id[i]);continue;
+                }
                 ESP_LOGI(TAG, "Custom wake word detected: command_id=%d, string=%s, prob=%f", 
                         mn_result->command_id[i], mn_result->string, mn_result->prob[i]);
                 auto& command = commands_[mn_result->command_id[i] - 1];

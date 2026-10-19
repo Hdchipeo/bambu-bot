@@ -8,12 +8,14 @@
 #include <freertos/task.h>
 
 #include "application.h"
+#include "system_info.h"
 #include "bambu/bambu_service.h"
 
 #define TAG "main"
 
 extern "C" void app_main(void)
 {
+    SystemInfo::InitializeCrashDiagnostics();
     // Initialize NVS flash for WiFi configuration
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {

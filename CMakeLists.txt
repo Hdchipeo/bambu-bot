@@ -13,5 +13,13 @@ option(BAMBU_ANIMATION_PREVIEW "Cycle all scenes and head emotions with demo tel
 option(BAMBU_PRINTER_PREVIEW "Show printer check while assistant is idle; retain alerts" OFF)
 option(BAMBU_COFFEE_PREVIEW "Show coffee while assistant is idle; retain printer alerts" OFF)
 option(BAMBU_FORCE_DEMO "Build without local printer credentials" OFF)
-set(PROJECT_VER "0.5.3")
+option(BAMBU_CRASH_DIAGNOSTICS "Enable extra heap and wake-word crash diagnostics" OFF)
+set(PROJECT_VER "0.5.4")
 project(bambu_bot)
+
+# Keep matching ELF files even after a later rebuild replaces the current ELF.
+add_custom_target(bambu_debug_symbols ALL
+    COMMAND python "${PROJECT_DIR}/scripts/archive_debug_symbols.py" "${CMAKE_BINARY_DIR}"
+    DEPENDS "${CMAKE_BINARY_DIR}/bambu_bot.elf"
+    VERBATIM)
+add_dependencies(flash bambu_debug_symbols)

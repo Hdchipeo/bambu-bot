@@ -46,6 +46,10 @@ private:
     char* mn_name_ = nullptr;
     std::string language_ = "cn";
     int duration_ = 3000;
+#ifdef BAMBU_CRASH_DIAGNOSTICS
+    uint32_t diagnostic_chunks_=0,diagnostic_timeouts_=0;
+    int64_t diagnostic_last_ms_=0;
+#endif
     float threshold_ = 0.2;
     std::deque<Command> commands_;
  

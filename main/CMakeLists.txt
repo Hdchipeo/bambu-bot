@@ -1247,3 +1247,7 @@ if(BAMBU_ANIMATION_PREVIEW)
     endif()
     target_compile_definitions(${COMPONENT_LIB} PRIVATE BAMBU_ANIMATION_PREVIEW=1)
 endif()
+
+if(BAMBU_CRASH_DIAGNOSTICS)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE BAMBU_CRASH_DIAGNOSTICS=1)
+endif()

@@ -17,6 +17,7 @@ public:
     static esp_err_t PrintTaskCpuUsage(TickType_t xTicksToWait);
     static void PrintTaskList();
     static void PrintHeapStats();
+    static void InitializeCrashDiagnostics();
     static void PrintPmLocks();
 };
 
