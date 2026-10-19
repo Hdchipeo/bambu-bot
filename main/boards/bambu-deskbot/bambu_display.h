@@ -2,6 +2,7 @@
 #include "display/lcd_display.h"
 #include "bambu/printer_state.h"
 #include "scene3d.h"
+#include "completion_timeout.h"
 
 // All public methods lock LVGL; the refresh timer already runs on the LVGL task.
 class BambuDisplay : public SpiLcdDisplay {
@@ -33,6 +34,7 @@ private:
     bambu::ui::Theme scene_theme_ = bambu::ui::Theme::Black;
     bambu::ui::Emotion requested_ = bambu::ui::Emotion::Idle;
     bambu::Snapshot printer_;
+    bambu::ui::CompletionTimeout completion_timeout_;
     std::string status_, chat_, notification_, shown_message_;
     uint32_t chat_started_ = 0, notification_started_ = 0, notification_duration_ = 0;
     bool system_chat_ = false, sleeping_ = false;

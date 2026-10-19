@@ -83,7 +83,10 @@ invalidate vùng ảnh; chữ/icon không đổi không được ghi lại.
 ## Chọn cảnh trong firmware bình thường
 
 - 15 cảnh vui luân phiên khi idle, mỗi 12 giây; không tự chèn lỗi/hoàn tất.
-- RUNNING/PREPARE dùng Printer check; FINISH có xác nhận dùng cảnh hoàn tất;
+- RUNNING/PREPARE dùng Printer check; FINISH dùng cảnh hoàn tất tối đa **30 giây**,
+  rồi về cảnh idle dù máy in tiếp tục gửi FINISH. Bản tin lặp, đổi theme, hội thoại
+  hoặc reconnect cùng job không đặt lại timeout; job mới được hiển thị lại.
+  Telemetry/MCP vẫn giữ FINISH và tiến độ thực;
   lỗi có dữ liệu xác nhận dùng Printer alert.
 - PAUSE/Warning chuyển sang đầu cảnh báo, không phát máy in đang chuyển động.
 - Listening/Thinking/Speaking và biểu cảm AI dùng clip phần đầu, không kèm đạo cụ.

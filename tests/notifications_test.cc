@@ -1,5 +1,6 @@
 #include "notifications.h"
 #include "voice_prompt.h"
+#include "../ui/completion_timeout.h"
 #include <cassert>
 #include <fstream>
 #include <iterator>
@@ -10,6 +11,28 @@ Snapshot Status(const char* state,int64_t now,const char* job="one"){
     s.error={0,now};s.hms={std::vector<HmsFault>{},now};return s;
 }
 int main(){
+    bambu::ui::CompletionTimeout completion;
+    assert(!completion.Show(true,"RUNNING","one",0));
+    assert(completion.Show(true,"FINISH","one",100));
+    assert(completion.Show(true,"FINISH","one",30099));
+    assert(!completion.Show(true,"FINISH","one",30100));
+    assert(!completion.Show(true,"FINISH","one",60000)); // Repeated MQTT updates cannot reset timeout.
+    assert(!completion.Show(false,"","",61000));
+    assert(!completion.Show(true,"FINISH","one",62000)); // Reconnect same job stays expired.
+    assert(!completion.Show(true,"IDLE","one",62100));
+    assert(!completion.Show(true,"FINISH","one",62200)); // An idle/finish status bounce is not a new print.
+    assert(completion.Show(true,"FINISH","two",63000)); // Next job gets its own celebration.
+    assert(!completion.Show(true,"PAUSE","two",64000));
+    assert(!completion.Show(true,"RUNNING","two",65000));
+    assert(completion.Show(true,"FINISH","two",66000)); // IDs can be reused by the printer.
+    bambu::ui::CompletionTimeout rollover;
+    assert(rollover.Show(true,"FINISH","",0xfffffff0u));
+    assert(rollover.Show(true,"FINISH","",0x10u));
+    assert(!rollover.Show(true,"FINISH","",0x8000u));
+    bambu::ui::CompletionTimeout sparse;
+    assert(sparse.Show(true,"FINISH","",0));
+    assert(!sparse.Show(true,"FINISH","known-later",30000)); // Late job metadata does not rearm.
+
     Notifications n;auto s=Status("RUNNING",0);n.Observe(s,0);assert(!n.Next(s,0)); // Mid-print boot.
     s=Status("PAUSE",1000);n.Observe(s,1000);s=Status("RUNNING",2000);n.Observe(s,2000);assert(!n.Next(s,2000));
     s=Status("FINISH",3000);n.Observe(s,3000);assert(n.Next(s,3000)->kind==NoticeKind::Completed);n.Accepted(3000);

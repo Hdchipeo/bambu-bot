@@ -9,7 +9,7 @@
 [![ESP32-S3](https://img.shields.io/badge/Target-ESP32--S3-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32-s3)
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-5.5.4-E7352C?style=flat-square&logo=espressif&logoColor=white)](https://github.com/espressif/esp-idf)
 [![LVGL](https://img.shields.io/badge/UI-LVGL_9.5.0-00AE42?style=flat-square)](https://lvgl.io/)
-[![Firmware](https://img.shields.io/badge/Firmware-v0.5.1-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
+[![Firmware](https://img.shields.io/badge/Firmware-v0.5.2-00AE42?style=flat-square)](https://github.com/Hdchipeo/bambu-bot/releases)
 [![Host Tests](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/host-tests.yml)
 [![Simulator](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml/badge.svg)](https://github.com/Hdchipeo/bambu-bot/actions/workflows/simulator.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
@@ -85,7 +85,7 @@ brew install cmake ninja sdl2
   <img src="docs/ui/all-heads-gallery.gif" alt="Một số biểu cảm đầu robot 3D của Bambu Bot" width="560" />
 </div>
 
-Firmware luân phiên **15 cảnh vui** khi idle, mỗi 12 giây. Cảnh máy in đang in, hoàn tất hoặc lỗi được chọn theo dữ liệu máy in xác nhận. Khi nghe/nói, robot ưu tiên biểu cảm hội thoại và ẩn đạo cụ idle. Biểu cảm AI không tự tạo sự kiện máy in.
+Firmware luân phiên **15 cảnh vui** khi idle, mỗi 12 giây. Cảnh **Print Complete!** hiện tối đa **30 giây** sau FINISH, rồi trở về IDLE; telemetry vẫn giữ trạng thái FINISH và tiến độ thực tế. Cảnh máy in đang in, hoàn tất hoặc lỗi được chọn theo dữ liệu máy in xác nhận. Khi nghe/nói, robot ưu tiên biểu cảm hội thoại và ẩn đạo cụ idle. Biểu cảm AI không tự tạo sự kiện máy in.
 
 Xem [hướng dẫn Studio](docs/UI_STUDIO.md), [toàn bộ preview và kiến trúc animation](docs/ANIMATION_BANK.md). Hai thử nghiệm ban đầu [Coffee](docs/COFFEE_PLAYBACK.md) và [Printer check](docs/PRINTER_PLAYBACK.md) được giữ làm tài liệu tham khảo.
 
@@ -191,7 +191,7 @@ LCD **280×240** dùng frame dựng sẵn thay cho dựng hình 3D mỗi frame t
 | **Ba câu thoại mô phỏng** | **90.222 byte** trong assets, Opus 16 kHz / 60 ms |
 | **Scratch giải mã palette** | **34.886 byte**, dùng lại giữa các frame |
 | **Assets với custom wake word + MN7 English** | **7.374.642 byte**, còn **1.013.966 byte** trong phân vùng 8 MiB |
-| **App cùng cấu hình MN7** | **0x359140 byte**, còn **15%** slot ứng dụng |
+| **App cùng cấu hình MN7** | **0x359280 byte**, còn **15%** slot ứng dụng |
 | **Nhịp phát mục tiêu** | **50 ms/frame → 20 FPS**; chưa đo FPS LCD khi chạy đồng thời MN7 |
 | **Dự phòng** | Thiếu/hỏng bank → renderer CPU 140×120, target 100 ms/frame |
 
